@@ -1,54 +1,108 @@
 
 
-# Social Media Analytics Dashboard
+# Social Media Analytics Dashboard — Live API Approach
 
-A full-featured analytics tracker for **YouTube, TikTok, Instagram, Facebook** (and extensible to more platforms) with a database backend, rich filtering/sorting, and data visualization.
+## Overview
 
-## Core Features
+Build a frontend-only analytics dashboard that pulls live data from platform APIs and displays it with rich filtering, sorting, and charts. No database or authentication needed.
 
-### 1. Dashboard Overview
-- At-a-glance stats across all platforms: total views, subscribers/followers gained, average retention, top-performing content
-- Platform-specific cards showing key metrics with trend indicators (up/down vs last period)
-- Time range selector (7d, 30d, 90d, custom)
+**Phase 1 (now):** Full UI for all 4 platforms + live YouTube API integration
+**Phase 2 (later):** Connect TikTok, Instagram, Facebook APIs as you get developer access
 
-### 2. Content Tracker (Per-Post Analytics)
-- Log individual posts/videos with: title, platform, publish date, views, likes, comments, shares, watch time/retention, subscriber/follower impact
-- Manual entry form with platform-specific fields (e.g., "view duration" for YouTube, "saves" for Instagram)
-- CSV upload to bulk-import analytics exports from each platform
-- Edit and update stats over time as numbers change
+---
 
-### 3. Advanced Filtering & Sorting
-- Filter by platform (YouTube, TikTok, Instagram, Facebook)
-- Filter by date range, content type (video, reel, story, post), performance tier
-- Sort by views, engagement rate, retention, subscriber gain, date posted
-- Save custom filter presets for quick access
+## Architecture
 
-### 4. Charts & Visualizations
-- Views over time (line chart, per platform or combined)
-- Engagement breakdown (bar chart: likes, comments, shares)
-- Platform comparison charts
-- Growth trends for subscribers/followers
-- Retention/watch time distribution
+- **No backend/database** — all data comes from APIs in real-time
+- **YouTube Data API v3** — live data for your channel (videos, views, watch time, subscribers)
+- **TikTok, Instagram, Facebook** — UI built with placeholder/mock data, ready to connect when API access is available
+- **API key stored securely** — YouTube API key will be used client-side (it's a public/restricted key, which is fine for YouTube Data API)
 
-### 5. Platform Pages
-- Dedicated page per platform with platform-specific metrics and insights
-- YouTube: view duration, CTR, subscriber delta
-- TikTok: completion rate, shares, profile views
-- Instagram: saves, reach, story views
-- Facebook: reach, reactions, shares
+---
 
-### 6. Database & Authentication
-- Supabase backend to persist all data
-- User authentication (login/signup) so your data is private and accessible from any device
-- All content entries linked to your account
+## What Gets Built
 
-## Data Input
-- **Manual entry**: Quick form to add a new post's stats
-- **CSV upload**: Bulk import from platform analytics exports
-- **YouTube API** (future phase): Auto-pull video stats from your channel
+### Pages & Navigation
+- **Dashboard** — overview cards, charts, time range selector
+- **Content Tracker** — table of all posts/videos with filtering and sorting
+- **Platform Pages** — YouTube, TikTok, Instagram, Facebook each get a dedicated page
+- **Settings** — API key configuration
 
-## Design
-- Clean, modern dark/light mode dashboard
-- Responsive — works on desktop and mobile
-- Card-based layout with clear data hierarchy
+### Dashboard Features
+- Total views, subscribers, engagement across platforms
+- Trend indicators (up/down arrows)
+- Time range selector (7d, 30d, 90d)
+- Platform breakdown cards
+
+### Content Tracker
+- Sortable/filterable table of posts
+- Filter by: platform, date range, content type
+- Sort by: views, likes, engagement rate, date
+- Search by title
+
+### Charts (using Recharts, already installed)
+- Views over time (line chart)
+- Engagement breakdown (bar chart)
+- Platform comparison
+- Subscriber/follower growth trends
+
+### YouTube Integration (live data)
+- Fetches your channel stats and recent videos via YouTube Data API v3
+- Shows: views, likes, comments, watch time, subscriber count
+- Pulls video-level analytics
+
+### Other Platforms (mock data for now)
+- Full UI identical to YouTube pages
+- Uses realistic mock data so the layout is ready
+- Easy to swap in real API calls later
+
+---
+
+## Technical Details
+
+### File Structure
+```text
+src/
+  pages/
+    Dashboard.tsx
+    ContentTracker.tsx
+    YouTubePage.tsx
+    TikTokPage.tsx
+    InstagramPage.tsx
+    FacebookPage.tsx
+    Settings.tsx
+  components/
+    layout/
+      AppSidebar.tsx
+      AppLayout.tsx
+    dashboard/
+      StatsCard.tsx
+      TimeRangeSelector.tsx
+      PlatformCard.tsx
+    content/
+      ContentTable.tsx
+      FilterBar.tsx
+      SortControls.tsx
+    charts/
+      ViewsChart.tsx
+      EngagementChart.tsx
+      PlatformComparisonChart.tsx
+      GrowthChart.tsx
+  hooks/
+    useYouTubeData.ts
+  lib/
+    youtube-api.ts
+    mock-data.ts
+    types.ts
+```
+
+### YouTube API Integration
+- Uses YouTube Data API v3 (channels.list, search.list, videos.list endpoints)
+- API key entered in Settings page, stored in localStorage
+- Custom React Query hooks for caching and refetching
+
+### Filtering & Sorting
+- Client-side filtering on the fetched data
+- Filter controls: platform chips, date picker, content type dropdown
+- Sort: clickable column headers in the content table
 
