@@ -3,7 +3,13 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import Dashboard from "./pages/Dashboard";
+import ContentTracker from "./pages/ContentTracker";
+import YouTubePage from "./pages/YouTubePage";
+import TikTokPage from "./pages/TikTokPage";
+import InstagramPage from "./pages/InstagramPage";
+import FacebookPage from "./pages/FacebookPage";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -15,8 +21,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/content" element={<ContentTracker />} />
+          <Route path="/youtube" element={<YouTubePage />} />
+          <Route path="/tiktok" element={<TikTokPage />} />
+          <Route path="/instagram" element={<InstagramPage />} />
+          <Route path="/facebook" element={<FacebookPage />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
