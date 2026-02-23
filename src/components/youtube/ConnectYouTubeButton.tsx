@@ -1,10 +1,48 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { initiateYouTubeAuth, isAuthenticated } from "@/lib/youtube-oauth";
-import { Youtube, CheckCircle } from "lucide-react";
+import { initiateYouTubeAuth, isAuthenticated, getYouTubeTokens } from "@/lib/youtube-oauth-supabase";
+import { Youtube, CheckCircle, Loader2 } from "lucide-react";
 
 export function ConnectYouTubeButton() {
-  const authenticated = isAuthenticated();
+  const [authenticated, setAuthenticated] = useState<boolean>(false);
+  const [channelTitle, setChannelTitle] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const isAuth = await isAuthenticated();
+      setAuthenticated(isAuth);
+
+      if (isAuth) {
+        const tokens = await getYouTubeTokens();
+        if (tokens?.channel_title) {
+          setChannelTitle(tokens.channel_title);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking YouTube auth:', error);
+      setAuthenticated(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (authenticated) {
     return (
@@ -15,9 +53,16 @@ export function ConnectYouTubeButton() {
             YouTube Connected
           </CardTitle>
           <CardDescription>
-            Your YouTube account is connected and we're fetching your personal analytics
+            {channelTitle
+              ? `Connected to: ${channelTitle}`
+              : 'Your YouTube account is connected'}
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            We're fetching your personal analytics including watch time, revenue, and traffic sources.
+          </p>
+        </CardContent>
       </Card>
     );
   }

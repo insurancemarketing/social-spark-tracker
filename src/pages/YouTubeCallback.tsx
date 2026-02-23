@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { exchangeCodeForToken, saveTokens } from "@/lib/youtube-oauth";
+import { exchangeCodeForToken } from "@/lib/youtube-oauth-supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 
@@ -28,12 +28,11 @@ export default function YouTubeCallback() {
       }
 
       try {
-        const tokens = await exchangeCodeForToken(code);
+        const result = await exchangeCodeForToken(code);
 
-        if (tokens.access_token) {
-          saveTokens(tokens);
+        if (result.success) {
           setStatus('success');
-          setMessage('Successfully connected to YouTube!');
+          setMessage(`Successfully connected to YouTube! Channel: ${result.channelTitle || 'Unknown'}`);
 
           // Redirect to YouTube page after 2 seconds
           setTimeout(() => {
@@ -41,7 +40,7 @@ export default function YouTubeCallback() {
           }, 2000);
         } else {
           setStatus('error');
-          setMessage('Failed to obtain access token');
+          setMessage(result.error || 'Failed to connect to YouTube');
         }
       } catch (err) {
         setStatus('error');
