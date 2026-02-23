@@ -18,7 +18,7 @@ import {
   TrafficSource,
   AnalyticsOverview,
 } from '@/lib/youtube-analytics-service';
-import { isYouTubeAuthenticated } from '@/lib/youtube-oauth-supabase';
+import { isAuthenticated as isYouTubeAuthenticated } from '@/lib/youtube-oauth-supabase';
 import { Eye, Clock, TrendingUp, Users } from 'lucide-react';
 
 export default function YouTubePage() {
