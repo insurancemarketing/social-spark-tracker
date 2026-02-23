@@ -205,43 +205,6 @@ export async function fetchVideoAnalytics(
 
   const row = data.rows?.[0] || Array(9).fill(0)
 
-  // Try to get thumbnail impressions and CTR data (might not be available for all videos)
-  let impressions = 0
-  let ctr = 0
-
-  try {
-    const ctrUrl = new URL('https://youtubeanalytics.googleapis.com/v2/reports')
-    ctrUrl.searchParams.set('ids', `channel==${tokens.channel_id}`)
-    ctrUrl.searchParams.set('startDate', startDate)
-    ctrUrl.searchParams.set('endDate', endDate)
-    ctrUrl.searchParams.set('filters', `video==${videoId}`)
-    ctrUrl.searchParams.set('metrics', 'impressions,impressionClickThroughRate')
-
-    const ctrResponse = await fetch(ctrUrl.toString(), {
-      headers: {
-        'Authorization': `Bearer ${tokens.access_token}`,
-      },
-    })
-
-    if (ctrResponse.ok) {
-      const ctrData = await ctrResponse.json()
-      console.log('✅ Impressions/CTR data for video:', videoId, ctrData)
-      const ctrRow = ctrData.rows?.[0]
-      if (ctrRow) {
-        impressions = ctrRow[0] || 0
-        ctr = ctrRow[1] || 0
-        console.log(`   → Impressions: ${impressions}, CTR: ${ctr}%`)
-      } else {
-        console.log('   → No impression data rows returned (might be too old or no YouTube traffic)')
-      }
-    } else {
-      const errorText = await ctrResponse.text()
-      console.log('❌ Impressions not available for video:', videoId, 'Error:', errorText)
-    }
-  } catch (e) {
-    console.log('❌ Could not fetch impressions for video:', videoId, e)
-  }
-
   return {
     videoId,
     views: row[0] || 0,
@@ -254,8 +217,8 @@ export async function fetchVideoAnalytics(
     shares: row[6] || 0,
     subscribersGained: row[7] || 0,
     subscribersLost: row[8] || 0,
-    impressions,
-    impressionClickThroughRate: ctr,
+    impressions: 0, // Not available via API
+    impressionClickThroughRate: 0, // Not available via API
   }
 }
 
