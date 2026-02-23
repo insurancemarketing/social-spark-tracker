@@ -205,7 +205,7 @@ export async function fetchVideoAnalytics(
 
   const row = data.rows?.[0] || Array(9).fill(0)
 
-  // Try to get impressions and CTR data (might not be available)
+  // Try to get thumbnail impressions and CTR data (might not be available for all videos)
   let impressions = 0
   let ctr = 0
 
@@ -215,7 +215,7 @@ export async function fetchVideoAnalytics(
     ctrUrl.searchParams.set('startDate', startDate)
     ctrUrl.searchParams.set('endDate', endDate)
     ctrUrl.searchParams.set('filters', `video==${videoId}`)
-    ctrUrl.searchParams.set('metrics', 'cardImpressions,cardClickRate')
+    ctrUrl.searchParams.set('metrics', 'impressions,impressionClickThroughRate')
 
     const ctrResponse = await fetch(ctrUrl.toString(), {
       headers: {
@@ -225,17 +225,21 @@ export async function fetchVideoAnalytics(
 
     if (ctrResponse.ok) {
       const ctrData = await ctrResponse.json()
-      console.log('Card impressions data:', videoId, ctrData)
+      console.log('✅ Impressions/CTR data for video:', videoId, ctrData)
       const ctrRow = ctrData.rows?.[0]
       if (ctrRow) {
         impressions = ctrRow[0] || 0
         ctr = ctrRow[1] || 0
+        console.log(`   → Impressions: ${impressions}, CTR: ${ctr}%`)
+      } else {
+        console.log('   → No impression data rows returned (might be too old or no YouTube traffic)')
       }
     } else {
-      console.log('Card impressions not available for video:', videoId, await ctrResponse.text())
+      const errorText = await ctrResponse.text()
+      console.log('❌ Impressions not available for video:', videoId, 'Error:', errorText)
     }
   } catch (e) {
-    console.log('Could not fetch card impressions for video:', videoId, e)
+    console.log('❌ Could not fetch impressions for video:', videoId, e)
   }
 
   return {
