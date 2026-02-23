@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AppLayout } from '@/components/layout/AppLayout';
 import { ConnectYouTubeButton } from '@/components/youtube/ConnectYouTubeButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { VideoPerformanceList } from '@/components/youtube/VideoPerformanceList';
@@ -111,16 +112,18 @@ export default function YouTubePage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 space-y-6">
-        <Skeleton className="h-12 w-64" />
-        <Skeleton className="h-[400px] w-full" />
-      </div>
+      <AppLayout>
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-64" />
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </AppLayout>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <div className="container mx-auto py-8">
+      <AppLayout>
         <Card>
           <CardHeader>
             <CardTitle>YouTube Analytics</CardTitle>
@@ -132,12 +135,13 @@ export default function YouTubePage() {
             <ConnectYouTubeButton />
           </CardContent>
         </Card>
-      </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <AppLayout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">YouTube Analytics</h1>
@@ -256,6 +260,7 @@ export default function YouTubePage() {
           analytics={analytics}
         />
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }

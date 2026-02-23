@@ -13,7 +13,7 @@ interface VideoPerformanceListProps {
   analytics?: Map<string, VideoAnalytics>;
 }
 
-type SortField = "views" | "likes" | "date" | "engagement" | "retention" | "ctr";
+type SortField = "views" | "likes" | "date" | "engagement" | "retention" | "shares";
 
 export function VideoPerformanceList({ videos, analytics }: VideoPerformanceListProps) {
   const [sortField, setSortField] = useState<SortField>("date");
@@ -28,13 +28,13 @@ export function VideoPerformanceList({ videos, analytics }: VideoPerformanceList
   const getPerformanceBadge = (video: YouTubeVideo, videoAnalytics?: VideoAnalytics) => {
     const engagement = calculateEngagement(video);
     const retention = videoAnalytics?.averageViewPercentage || 0;
-    const ctr = videoAnalytics?.impressionClickThroughRate || 0;
+    const shares = videoAnalytics?.shares || 0;
 
     if (retention > 50 && engagement > 5) {
       return <Badge className="bg-green-600">High Performer</Badge>;
     }
-    if (ctr > 10) {
-      return <Badge className="bg-blue-600">Great CTR</Badge>;
+    if (shares > 100) {
+      return <Badge className="bg-blue-600">Viral Potential</Badge>;
     }
     if (engagement > 5) {
       return <Badge className="bg-purple-600">High Engagement</Badge>;
@@ -65,9 +65,9 @@ export function VideoPerformanceList({ videos, analytics }: VideoPerformanceList
         aVal = analytics?.get(a.id)?.averageViewPercentage || 0;
         bVal = analytics?.get(b.id)?.averageViewPercentage || 0;
         break;
-      case "ctr":
-        aVal = analytics?.get(a.id)?.impressionClickThroughRate || 0;
-        bVal = analytics?.get(b.id)?.impressionClickThroughRate || 0;
+      case "shares":
+        aVal = analytics?.get(a.id)?.shares || 0;
+        bVal = analytics?.get(b.id)?.shares || 0;
         break;
       case "date":
       default:
@@ -109,9 +109,9 @@ export function VideoPerformanceList({ videos, analytics }: VideoPerformanceList
               <SelectContent>
                 <SelectItem value="date">Date</SelectItem>
                 <SelectItem value="views">Views</SelectItem>
-                <SelectItem value="ctr">CTR</SelectItem>
                 <SelectItem value="retention">Retention</SelectItem>
                 <SelectItem value="engagement">Engagement</SelectItem>
+                <SelectItem value="shares">Shares</SelectItem>
                 <SelectItem value="likes">Likes</SelectItem>
               </SelectContent>
             </Select>
@@ -140,30 +140,6 @@ export function VideoPerformanceList({ videos, analytics }: VideoPerformanceList
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs max-w-xs">Total number of times your video was watched</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </TableHead>
-                <TableHead className="text-right">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger className="flex items-center justify-end gap-1">
-                        CTR <HelpCircle className="h-3 w-3" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs max-w-xs">Click-through rate: % of people who clicked after seeing your thumbnail. Good: 4-8%, Great: 10%+</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </TableHead>
-                <TableHead className="text-right">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger className="flex items-center justify-end gap-1">
-                        Impressions <HelpCircle className="h-3 w-3" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs max-w-xs">How many times your thumbnail was shown to viewers</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -269,16 +245,6 @@ export function VideoPerformanceList({ videos, analytics }: VideoPerformanceList
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {formatNumber(video.statistics.viewCount)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {videoAnalytics?.impressionClickThroughRate
-                        ? `${videoAnalytics.impressionClickThroughRate.toFixed(1)}%`
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {videoAnalytics?.impressions
-                        ? formatNumber(videoAnalytics.impressions)
-                        : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {videoAnalytics?.averageViewPercentage
