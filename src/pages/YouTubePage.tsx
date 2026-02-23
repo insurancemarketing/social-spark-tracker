@@ -61,15 +61,16 @@ export default function YouTubePage() {
         const videosData = await fetchYouTubeVideos(50);
         setVideos(videosData);
 
-        // Load analytics for each video
+        // Load analytics for each video (limit to 25 to avoid rate limits)
         const analyticsMap = new Map<string, VideoAnalytics>();
-        const videoPromises = videosData.slice(0, 10).map(async (video) => {
+        const videoPromises = videosData.slice(0, 25).map(async (video) => {
           try {
             const videoAnalytics = await fetchVideoAnalytics(
               video.id,
               startDate.toISOString().split('T')[0],
               endDate.toISOString().split('T')[0]
             );
+            console.log(`Analytics for ${video.title}:`, videoAnalytics);
             analyticsMap.set(video.id, videoAnalytics);
           } catch (error) {
             console.error(`Failed to fetch analytics for video ${video.id}:`, error);

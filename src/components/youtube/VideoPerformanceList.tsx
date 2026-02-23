@@ -196,10 +196,46 @@ export function VideoPerformanceList({ videos, analytics }: VideoPerformanceList
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger className="flex items-center justify-end gap-1">
+                        Avg Duration <HelpCircle className="h-3 w-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs max-w-xs">Average time each viewer watches. Shows if your video holds attention throughout</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
+                <TableHead className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger className="flex items-center justify-end gap-1">
                         Watch Time <HelpCircle className="h-3 w-3" />
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs max-w-xs">Total minutes watched. YouTube's #1 metric for recommendations</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
+                <TableHead className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger className="flex items-center justify-end gap-1">
+                        Shares <HelpCircle className="h-3 w-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs max-w-xs">How many times viewers shared your video. High shares = viral potential</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
+                <TableHead className="text-right">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger className="flex items-center justify-end gap-1">
+                        Subs +/- <HelpCircle className="h-3 w-3" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs max-w-xs">Subscribers gained (green) vs lost (red) from this video. Shows content quality</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -252,10 +288,30 @@ export function VideoPerformanceList({ videos, analytics }: VideoPerformanceList
                     <TableCell className="text-right font-mono">
                       {engagement.toFixed(1)}%
                     </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {videoAnalytics?.averageViewDuration
+                        ? `${Math.floor(videoAnalytics.averageViewDuration / 60)}:${(videoAnalytics.averageViewDuration % 60).toString().padStart(2, '0')}`
+                        : "-"}
+                    </TableCell>
                     <TableCell className="text-right font-mono">
                       {videoAnalytics?.watchTime
                         ? `${Math.floor(videoAnalytics.watchTime / 60)}h`
                         : "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {videoAnalytics?.shares
+                        ? formatNumber(videoAnalytics.shares)
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {videoAnalytics ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-green-600">+{videoAnalytics.subscribersGained}</span>
+                          {videoAnalytics.subscribersLost > 0 && (
+                            <span className="text-red-600">-{videoAnalytics.subscribersLost}</span>
+                          )}
+                        </div>
+                      ) : "-"}
                     </TableCell>
                     <TableCell>
                       {getPerformanceBadge(video, videoAnalytics)}
