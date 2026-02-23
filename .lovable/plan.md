@@ -1,108 +1,64 @@
 
 
-# Social Media Analytics Dashboard — Live API Approach
+# Instagram + Facebook Live API Integration
 
-## Overview
+## The Big Win
 
-Build a frontend-only analytics dashboard that pulls live data from platform APIs and displays it with rich filtering, sorting, and charts. No database or authentication needed.
-
-**Phase 1 (now):** Full UI for all 4 platforms + live YouTube API integration
-**Phase 2 (later):** Connect TikTok, Instagram, Facebook APIs as you get developer access
-
----
-
-## Architecture
-
-- **No backend/database** — all data comes from APIs in real-time
-- **YouTube Data API v3** — live data for your channel (videos, views, watch time, subscribers)
-- **TikTok, Instagram, Facebook** — UI built with placeholder/mock data, ready to connect when API access is available
-- **API key stored securely** — YouTube API key will be used client-side (it's a public/restricted key, which is fine for YouTube Data API)
-
----
+One Meta Developer App gives you **both** Instagram and Facebook live data. Same access token, same setup — two platforms connected at once.
 
 ## What Gets Built
 
-### Pages & Navigation
-- **Dashboard** — overview cards, charts, time range selector
-- **Content Tracker** — table of all posts/videos with filtering and sorting
-- **Platform Pages** — YouTube, TikTok, Instagram, Facebook each get a dedicated page
-- **Settings** — API key configuration
+### 1. Meta Graph API Library (`src/lib/meta-api.ts`)
+- Shared fetch helper for the Meta Graph API (graph.facebook.com)
+- **Instagram functions**: fetch profile stats (followers, media count), fetch recent media with metrics (reach, impressions, likes, comments, saves)
+- **Facebook functions**: fetch page stats (followers, post reach), fetch recent posts with metrics (reactions, comments, shares, reach)
+- Token and ID getters/setters using localStorage (same pattern as YouTube)
 
-### Dashboard Features
-- Total views, subscribers, engagement across platforms
-- Trend indicators (up/down arrows)
-- Time range selector (7d, 30d, 90d)
-- Platform breakdown cards
+### 2. React Query Hooks
+- `src/hooks/useInstagramData.ts` — hooks for Instagram profile and media
+- `src/hooks/useFacebookData.ts` — hooks for Facebook page and posts
 
-### Content Tracker
-- Sortable/filterable table of posts
-- Filter by: platform, date range, content type
-- Sort by: views, likes, engagement rate, date
-- Search by title
+### 3. Settings Page Update
+Replace the "Other Platforms" placeholder card with two real configuration sections:
+- **Instagram**: Access Token field + Instagram Business Account ID field
+- **Facebook**: Uses same access token + Facebook Page ID field
+- Each has a "Save & Connect" button that invalidates the relevant queries
+- Helpful links to where to find your account/page IDs
 
-### Charts (using Recharts, already installed)
-- Views over time (line chart)
-- Engagement breakdown (bar chart)
-- Platform comparison
-- Subscriber/follower growth trends
+### 4. Instagram Page — Live Data
+- Same pattern as YouTube: show live data when token is set, fall back to mock data otherwise
+- Warning banner with "Go to Settings" button when not connected
+- Stats cards: Reach, Followers, Likes, Saves (from real API)
+- Recent media table with real engagement numbers
 
-### YouTube Integration (live data)
-- Fetches your channel stats and recent videos via YouTube Data API v3
-- Shows: views, likes, comments, watch time, subscriber count
-- Pulls video-level analytics
+### 5. Facebook Page — Live Data
+- Same live/mock pattern
+- Stats cards: Reach, Page Followers, Reactions, Shares (from real API)
+- Recent posts table with real metrics
 
-### Other Platforms (mock data for now)
-- Full UI identical to YouTube pages
-- Uses realistic mock data so the layout is ready
-- Easy to swap in real API calls later
+## API Endpoints Used
 
----
+| Platform | Endpoint | Data |
+|----------|----------|------|
+| Instagram | `GET /{ig-user-id}?fields=followers_count,media_count,username` | Profile stats |
+| Instagram | `GET /{ig-user-id}/media?fields=caption,timestamp,like_count,comments_count,media_type,permalink,thumbnail_url,insights.metric(reach,impressions,saved)` | Post-level metrics |
+| Facebook | `GET /{page-id}?fields=name,followers_count,fan_count` | Page stats |
+| Facebook | `GET /{page-id}/posts?fields=message,created_time,shares,insights.metric(post_impressions,post_reactions_by_type_total)` | Post metrics |
 
-## Technical Details
+## What You'll Need (one-time setup)
 
-### File Structure
-```text
-src/
-  pages/
-    Dashboard.tsx
-    ContentTracker.tsx
-    YouTubePage.tsx
-    TikTokPage.tsx
-    InstagramPage.tsx
-    FacebookPage.tsx
-    Settings.tsx
-  components/
-    layout/
-      AppSidebar.tsx
-      AppLayout.tsx
-    dashboard/
-      StatsCard.tsx
-      TimeRangeSelector.tsx
-      PlatformCard.tsx
-    content/
-      ContentTable.tsx
-      FilterBar.tsx
-      SortControls.tsx
-    charts/
-      ViewsChart.tsx
-      EngagementChart.tsx
-      PlatformComparisonChart.tsx
-      GrowthChart.tsx
-  hooks/
-    useYouTubeData.ts
-  lib/
-    youtube-api.ts
-    mock-data.ts
-    types.ts
-```
+1. A **Meta Developer App** at developers.facebook.com
+2. Your **Instagram Professional Account** linked to a **Facebook Page**
+3. A **long-lived access token** (valid 60 days, can be refreshed)
+4. Your **Instagram Business Account ID** and **Facebook Page ID**
 
-### YouTube API Integration
-- Uses YouTube Data API v3 (channels.list, search.list, videos.list endpoints)
-- API key entered in Settings page, stored in localStorage
-- Custom React Query hooks for caching and refetching
+I can walk you through each step after we build this.
 
-### Filtering & Sorting
-- Client-side filtering on the fetched data
-- Filter controls: platform chips, date picker, content type dropdown
-- Sort: clickable column headers in the content table
+## Technical Approach
+
+- Follows the exact same architecture as the YouTube integration
+- Access token stored in localStorage (it's a user token, not a secret server key)
+- React Query handles caching and refetching (5-minute stale time)
+- Graceful fallback to mock data when not connected
+- Error handling with user-friendly messages
 
