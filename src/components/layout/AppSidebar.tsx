@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   FileText,
+  MessageSquare,
   Youtube,
   Music2,
   Instagram,
@@ -22,6 +23,7 @@ import {
 const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Content Tracker", url: "/content", icon: FileText },
+  { title: "DM Pipeline", url: "/dm-pipeline", icon: MessageSquare },
 ];
 
 const platformItems = [

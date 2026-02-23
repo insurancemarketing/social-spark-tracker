@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import ContentTracker from "./pages/ContentTracker";
+import DMPipeline from "./pages/DMPipeline";
 import YouTubePage from "./pages/YouTubePage";
 import TikTokPage from "./pages/TikTokPage";
 import InstagramPage from "./pages/InstagramPage";
@@ -23,6 +24,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/content" element={<ContentTracker />} />
+          <Route path="/dm-pipeline" element={<DMPipeline />} />
           <Route path="/youtube" element={<YouTubePage />} />
           <Route path="/tiktok" element={<TikTokPage />} />
           <Route path="/instagram" element={<InstagramPage />} />
