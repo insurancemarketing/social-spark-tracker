@@ -180,12 +180,13 @@ export async function fetchVideoAnalytics(
     throw new Error('Not authenticated with YouTube')
   }
 
+  // First, try to get basic metrics
   const analyticsUrl = new URL('https://youtubeanalytics.googleapis.com/v2/reports')
   analyticsUrl.searchParams.set('ids', `channel==${tokens.channel_id}`)
   analyticsUrl.searchParams.set('startDate', startDate)
   analyticsUrl.searchParams.set('endDate', endDate)
   analyticsUrl.searchParams.set('filters', `video==${videoId}`)
-  analyticsUrl.searchParams.set('metrics', 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares,subscribersGained,subscribersLost,cardImpressions,cardClickRate')
+  analyticsUrl.searchParams.set('metrics', 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,comments,shares,subscribersGained,subscribersLost')
 
   const response = await fetch(analyticsUrl.toString(), {
     headers: {
@@ -194,13 +195,17 @@ export async function fetchVideoAnalytics(
   })
 
   if (!response.ok) {
-    throw new Error('Failed to fetch video analytics')
+    const errorText = await response.text()
+    console.error('YouTube Analytics API error:', errorText)
+    throw new Error(`Failed to fetch video analytics: ${response.status}`)
   }
 
   const data = await response.json()
-  const row = data.rows?.[0] || Array(13).fill(0)
+  console.log('Raw API response for video:', videoId, data)
 
-  // Try to get impressions and CTR data
+  const row = data.rows?.[0] || Array(9).fill(0)
+
+  // Try to get impressions and CTR data (might not be available)
   let impressions = 0
   let ctr = 0
 
@@ -210,7 +215,7 @@ export async function fetchVideoAnalytics(
     ctrUrl.searchParams.set('startDate', startDate)
     ctrUrl.searchParams.set('endDate', endDate)
     ctrUrl.searchParams.set('filters', `video==${videoId}`)
-    ctrUrl.searchParams.set('metrics', 'impressions,impressionClickThroughRate')
+    ctrUrl.searchParams.set('metrics', 'cardImpressions,cardClickRate')
 
     const ctrResponse = await fetch(ctrUrl.toString(), {
       headers: {
@@ -220,13 +225,17 @@ export async function fetchVideoAnalytics(
 
     if (ctrResponse.ok) {
       const ctrData = await ctrResponse.json()
-      const ctrRow = ctrData.rows?.[0] || [0, 0]
-      impressions = ctrRow[0] || 0
-      ctr = ctrRow[1] || 0
+      console.log('Card impressions data:', videoId, ctrData)
+      const ctrRow = ctrData.rows?.[0]
+      if (ctrRow) {
+        impressions = ctrRow[0] || 0
+        ctr = ctrRow[1] || 0
+      }
+    } else {
+      console.log('Card impressions not available for video:', videoId, await ctrResponse.text())
     }
   } catch (e) {
-    // Impressions data might not be available for all videos
-    console.log('Could not fetch impressions data for video:', videoId)
+    console.log('Could not fetch card impressions for video:', videoId, e)
   }
 
   return {
@@ -236,11 +245,11 @@ export async function fetchVideoAnalytics(
     averageViewDuration: row[2] || 0,
     averageViewPercentage: row[3] || 0,
     likes: row[4] || 0,
-    dislikes: row[5] || 0,
-    comments: row[6] || 0,
-    shares: row[7] || 0,
-    subscribersGained: row[8] || 0,
-    subscribersLost: row[9] || 0,
+    dislikes: 0, // YouTube removed dislikes
+    comments: row[5] || 0,
+    shares: row[6] || 0,
+    subscribersGained: row[7] || 0,
+    subscribersLost: row[8] || 0,
     impressions,
     impressionClickThroughRate: ctr,
   }
