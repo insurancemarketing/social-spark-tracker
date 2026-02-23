@@ -1,122 +1,260 @@
-import { useState, useEffect } from "react";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { StatsCard } from "@/components/dashboard/StatsCard";
-import { TimeRangeSelector } from "@/components/dashboard/TimeRangeSelector";
-import { ContentTable } from "@/components/content/ContentTable";
-import { ViewsChart } from "@/components/charts/ViewsChart";
-import { GrowthChart } from "@/components/charts/GrowthChart";
-import { ConnectYouTubeButton } from "@/components/youtube/ConnectYouTubeButton";
-import { getYouTubeTokens, fetchChannelInfo } from "@/lib/youtube-oauth-supabase";
-import { mockPlatformStats, mockDailyData, mockContent } from "@/lib/mock-data";
-import { TimeRange } from "@/lib/types";
-import { Eye, Users, PlayCircle, Loader2 } from "lucide-react";
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
+import { useState, useEffect } from 'react';
+import { ConnectYouTubeButton } from '@/components/youtube/ConnectYouTubeButton';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { VideoPerformanceList } from '@/components/youtube/VideoPerformanceList';
+import { TrafficSourcesChart } from '@/components/youtube/TrafficSourcesChart';
+import { AnalyticsCharts } from '@/components/youtube/AnalyticsCharts';
+import { InsightsCard } from '@/components/youtube/InsightsCard';
+import { DateRangeFilter } from '@/components/youtube/DateRangeFilter';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  fetchYouTubeVideos,
+  fetchYouTubeAnalytics,
+  fetchVideoAnalytics,
+  fetchTrafficSources,
+  fetchAnalyticsTimeSeries,
+  YouTubeVideo,
+  VideoAnalytics,
+  TrafficSource,
+  AnalyticsOverview,
+} from '@/lib/youtube-analytics-service';
+import { isYouTubeAuthenticated } from '@/lib/youtube-oauth-supabase';
+import { Eye, Clock, TrendingUp, Users } from 'lucide-react';
 
 export default function YouTubePage() {
-  const [timeRange, setTimeRange] = useState<TimeRange>("30d");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [channelData, setChannelData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [videos, setVideos] = useState<YouTubeVideo[]>([]);
+  const [analytics, setAnalytics] = useState<Map<string, VideoAnalytics>>(new Map());
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
+  const [trafficSources, setTrafficSources] = useState<TrafficSource[]>([]);
+  const [viewsTimeSeries, setViewsTimeSeries] = useState<Array<{ date: string; value: number }>>([]);
+  const [watchTimeTimeSeries, setWatchTimeTimeSeries] = useState<Array<{ date: string; value: number }>>([]);
+  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
 
   useEffect(() => {
-    checkAuthAndFetchData();
+    checkAuthAndLoadData();
   }, []);
 
-  const checkAuthAndFetchData = async () => {
+  useEffect(() => {
+    if (isAuthenticated && dateRange.startDate && dateRange.endDate) {
+      loadAnalyticsData();
+    }
+  }, [dateRange, isAuthenticated]);
+
+  const checkAuthAndLoadData = async () => {
     try {
-      const tokens = await getYouTubeTokens();
+      const authenticated = await isYouTubeAuthenticated();
+      setIsAuthenticated(authenticated);
 
-      if (tokens) {
-        setIsAuthenticated(true);
+      if (authenticated) {
+        // Set default date range (last 30 days)
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+        setDateRange({
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0],
+        });
 
-        // Fetch channel info
-        const channelInfo = await fetchChannelInfo();
-        if (channelInfo?.items?.[0]) {
-          setChannelData(channelInfo.items[0]);
-        }
+        // Load videos
+        const videosData = await fetchYouTubeVideos(50);
+        setVideos(videosData);
+
+        // Load analytics for each video
+        const analyticsMap = new Map<string, VideoAnalytics>();
+        const videoPromises = videosData.slice(0, 10).map(async (video) => {
+          try {
+            const videoAnalytics = await fetchVideoAnalytics(
+              video.id,
+              startDate.toISOString().split('T')[0],
+              endDate.toISOString().split('T')[0]
+            );
+            analyticsMap.set(video.id, videoAnalytics);
+          } catch (error) {
+            console.error(`Failed to fetch analytics for video ${video.id}:`, error);
+          }
+        });
+
+        await Promise.all(videoPromises);
+        setAnalytics(analyticsMap);
       }
     } catch (error) {
-      console.error('Error fetching YouTube data:', error);
+      console.error('Error loading YouTube data:', error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const ytStats = mockPlatformStats.find((s) => s.platform === "youtube")!;
-  const ytDaily = mockDailyData.filter((d) => d.platform === "youtube");
-  const ytContent = mockContent.filter((c) => c.platform === "youtube");
+  const loadAnalyticsData = async () => {
+    try {
+      const [overviewData, trafficData, viewsData, watchTimeData] = await Promise.all([
+        fetchYouTubeAnalytics(dateRange.startDate, dateRange.endDate),
+        fetchTrafficSources(dateRange.startDate, dateRange.endDate),
+        fetchAnalyticsTimeSeries(dateRange.startDate, dateRange.endDate, 'views'),
+        fetchAnalyticsTimeSeries(dateRange.startDate, dateRange.endDate, 'estimatedMinutesWatched'),
+      ]);
 
-  const stats = channelData?.statistics;
-  const snippet = channelData?.snippet;
+      setOverview(overviewData);
+      setTrafficSources(trafficData);
+      setViewsTimeSeries(viewsData);
+      setWatchTimeTimeSeries(watchTimeData);
+    } catch (error) {
+      console.error('Error loading analytics data:', error);
+    }
+  };
+
+  const handleDateRangeChange = (startDate: string, endDate: string) => {
+    setDateRange({ startDate, endDate });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 space-y-6">
+        <Skeleton className="h-12 w-64" />
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>YouTube Analytics</CardTitle>
+            <CardDescription>
+              Connect your YouTube account to see advanced analytics, video performance, and actionable insights
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ConnectYouTubeButton />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              <span className="text-youtube">YouTube</span> Analytics
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {isAuthenticated && snippet
-                ? `Connected: ${snippet.title}`
-                : "Connect your YouTube account to see personal analytics"}
-            </p>
-          </div>
-          <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
+    <div className="container mx-auto py-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">YouTube Analytics</h1>
+          <p className="text-muted-foreground">
+            Comprehensive insights into your channel performance
+          </p>
         </div>
-
-        {/* OAuth Connect Button */}
         <ConnectYouTubeButton />
+      </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatsCard
-                title="Total Views"
-                value={formatNumber(stats?.viewCount ? parseInt(stats.viewCount) : ytStats.totalViews)}
-                trend={ytStats.viewsTrend}
-                icon={<Eye className="h-4 w-4" />}
-              />
-              <StatsCard
-                title="Subscribers"
-                value={formatNumber(stats?.subscriberCount ? parseInt(stats.subscriberCount) : ytStats.followers)}
-                trend={5.2}
-                icon={<Users className="h-4 w-4" />}
-              />
-              <StatsCard
-                title="Videos"
-                value={stats?.videoCount || "156"}
-                icon={<PlayCircle className="h-4 w-4" />}
-              />
-              <StatsCard
-                title="Engagement Rate"
-                value={`${ytStats.engagementRate}%`}
-                trend={1.4}
-              />
-            </div>
+      {/* Date Range Filter */}
+      <DateRangeFilter onDateRangeChange={handleDateRangeChange} />
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <ViewsChart data={ytDaily} timeRange={timeRange} />
-              <GrowthChart data={ytDaily} timeRange={timeRange} />
-            </div>
+      {/* Overview Stats */}
+      {overview && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Views</CardTitle>
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{overview.views.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">
+                In selected date range
+              </p>
+            </CardContent>
+          </Card>
 
-            <div>
-              <h2 className="mb-4 text-lg font-semibold">Recent Videos</h2>
-              <ContentTable data={ytContent} />
-            </div>
-          </>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Watch Time</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {Math.floor(overview.watchTime / 60).toLocaleString()}h
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total minutes watched
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Avg View Duration</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {Math.floor(overview.averageViewDuration / 60)}:
+                {(overview.averageViewDuration % 60).toString().padStart(2, '0')}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Minutes per view
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Subscribers Gained</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                +{overview.subscribers.toLocaleString()}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                New subscribers
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Insights Card */}
+      <InsightsCard
+        videos={videos}
+        analytics={analytics}
+        trafficSources={trafficSources}
+      />
+
+      {/* Time Series Charts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {viewsTimeSeries.length > 0 && (
+          <AnalyticsCharts
+            data={viewsTimeSeries}
+            metric="views"
+            title="Views Over Time"
+            description="Daily view trends"
+            explanation="Track your video views over time. Spikes indicate viral content or successful promotions. Look for patterns in what days perform best."
+          />
+        )}
+        {watchTimeTimeSeries.length > 0 && (
+          <AnalyticsCharts
+            data={watchTimeTimeSeries}
+            metric="estimatedMinutesWatched"
+            title="Watch Time Over Time"
+            description="Daily watch time trends"
+            explanation="Watch time is crucial for YouTube's algorithm. Higher watch time = more recommendations. This is often more important than view count."
+          />
         )}
       </div>
-    </AppLayout>
+
+      {/* Traffic Sources */}
+      {trafficSources.length > 0 && (
+        <TrafficSourcesChart sources={trafficSources} />
+      )}
+
+      {/* Video Performance List */}
+      {videos.length > 0 && (
+        <VideoPerformanceList
+          videos={videos}
+          analytics={analytics}
+        />
+      )}
+    </div>
   );
 }
