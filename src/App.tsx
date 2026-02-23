@@ -7,6 +7,7 @@ import Dashboard from "./pages/Dashboard";
 import ContentTracker from "./pages/ContentTracker";
 import DMPipeline from "./pages/DMPipeline";
 import YouTubePage from "./pages/YouTubePage";
+import YouTubeCallback from "./pages/YouTubeCallback";
 import TikTokPage from "./pages/TikTokPage";
 import InstagramPage from "./pages/InstagramPage";
 import FacebookPage from "./pages/FacebookPage";
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/content" element={<ContentTracker />} />
           <Route path="/dm-pipeline" element={<DMPipeline />} />
           <Route path="/youtube" element={<YouTubePage />} />
+          <Route path="/youtube/callback" element={<YouTubeCallback />} />
           <Route path="/tiktok" element={<TikTokPage />} />
           <Route path="/instagram" element={<InstagramPage />} />
           <Route path="/facebook" element={<FacebookPage />} />
