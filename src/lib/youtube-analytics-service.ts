@@ -30,6 +30,8 @@ export interface VideoAnalytics {
   subscribersGained: number
   subscribersLost: number
   estimatedRevenue?: number
+  impressions: number
+  impressionClickThroughRate: number // CTR as percentage
 }
 
 export interface TrafficSource {
@@ -183,7 +185,7 @@ export async function fetchVideoAnalytics(
   analyticsUrl.searchParams.set('startDate', startDate)
   analyticsUrl.searchParams.set('endDate', endDate)
   analyticsUrl.searchParams.set('filters', `video==${videoId}`)
-  analyticsUrl.searchParams.set('metrics', 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares,subscribersGained,subscribersLost')
+  analyticsUrl.searchParams.set('metrics', 'views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,likes,dislikes,comments,shares,subscribersGained,subscribersLost,cardImpressions,cardClickRate')
 
   const response = await fetch(analyticsUrl.toString(), {
     headers: {
@@ -196,7 +198,36 @@ export async function fetchVideoAnalytics(
   }
 
   const data = await response.json()
-  const row = data.rows?.[0] || Array(11).fill(0)
+  const row = data.rows?.[0] || Array(13).fill(0)
+
+  // Try to get impressions and CTR data
+  let impressions = 0
+  let ctr = 0
+
+  try {
+    const ctrUrl = new URL('https://youtubeanalytics.googleapis.com/v2/reports')
+    ctrUrl.searchParams.set('ids', `channel==${tokens.channel_id}`)
+    ctrUrl.searchParams.set('startDate', startDate)
+    ctrUrl.searchParams.set('endDate', endDate)
+    ctrUrl.searchParams.set('filters', `video==${videoId}`)
+    ctrUrl.searchParams.set('metrics', 'impressions,impressionClickThroughRate')
+
+    const ctrResponse = await fetch(ctrUrl.toString(), {
+      headers: {
+        'Authorization': `Bearer ${tokens.access_token}`,
+      },
+    })
+
+    if (ctrResponse.ok) {
+      const ctrData = await ctrResponse.json()
+      const ctrRow = ctrData.rows?.[0] || [0, 0]
+      impressions = ctrRow[0] || 0
+      ctr = ctrRow[1] || 0
+    }
+  } catch (e) {
+    // Impressions data might not be available for all videos
+    console.log('Could not fetch impressions data for video:', videoId)
+  }
 
   return {
     videoId,
@@ -210,6 +241,8 @@ export async function fetchVideoAnalytics(
     shares: row[7] || 0,
     subscribersGained: row[8] || 0,
     subscribersLost: row[9] || 0,
+    impressions,
+    impressionClickThroughRate: ctr,
   }
 }
 
