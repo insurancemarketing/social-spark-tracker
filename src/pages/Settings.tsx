@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,9 +10,10 @@ import {
   getInstagramAccountId, setInstagramAccountId,
   getFacebookPageId, setFacebookPageId,
 } from "@/lib/meta-api";
-import { Check, Key, Hash } from "lucide-react";
+import { Check, Key, Hash, Facebook, Instagram } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { initiateFacebookAuth, isAuthenticated, getPageInfo, disconnectFacebook } from "@/lib/facebook-oauth-simple";
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -25,6 +26,42 @@ export default function Settings() {
   const [metaToken, setMetaToken] = useState(getMetaAccessToken() || "");
   const [igAccountId, setIgAccountId] = useState(getInstagramAccountId() || "");
   const [fbPageId, setFbPageId] = useState(getFacebookPageId() || "");
+
+  // Facebook/Instagram OAuth
+  const [isFbConnected, setIsFbConnected] = useState(false);
+  const [fbPageInfo, setFbPageInfo] = useState<any>(null);
+  const [fbLoading, setFbLoading] = useState(true);
+
+  useEffect(() => {
+    checkFacebookConnection();
+  }, []);
+
+  const checkFacebookConnection = async () => {
+    setFbLoading(true);
+    const connected = await isAuthenticated();
+    setIsFbConnected(connected);
+    if (connected) {
+      const info = await getPageInfo();
+      setFbPageInfo(info);
+    }
+    setFbLoading(false);
+  };
+
+  const handleConnectFacebook = () => {
+    initiateFacebookAuth();
+  };
+
+  const handleDisconnectFacebook = async () => {
+    const success = await disconnectFacebook();
+    if (success) {
+      toast.success("Disconnected from Facebook & Instagram");
+      await checkFacebookConnection();
+      queryClient.invalidateQueries({ queryKey: ["instagram-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["instagram-media"] });
+    } else {
+      toast.error("Failed to disconnect");
+    }
+  };
 
   const handleSaveYouTube = () => {
     setYouTubeApiKey(apiKey);
@@ -86,12 +123,52 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Meta Access Token (shared) */}
+        {/* Facebook & Instagram OAuth - NEW METHOD */}
+        <Card className="border-2 border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Facebook className="h-5 w-5 text-facebook" />
+              <Instagram className="h-5 w-5 text-instagram" />
+              Facebook & Instagram (OAuth)
+            </CardTitle>
+            <CardDescription>
+              Connect with one click using Facebook Login. This is the easiest way to connect both platforms automatically.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {fbLoading ? (
+              <div className="text-sm text-muted-foreground">Loading connection status...</div>
+            ) : isFbConnected && fbPageInfo ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="font-medium">Connected to {fbPageInfo.pageName}</span>
+                </div>
+                {fbPageInfo.instagramConnected && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Instagram className="h-4 w-4" />
+                    <span>Instagram Business Account linked</span>
+                  </div>
+                )}
+                <Button variant="destructive" onClick={handleDisconnectFacebook}>
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <Button onClick={handleConnectFacebook} className="w-full">
+                <Facebook className="mr-2 h-4 w-4" />
+                Connect Facebook & Instagram
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Meta Access Token (shared) - MANUAL METHOD */}
         <Card>
           <CardHeader>
-            <CardTitle>Meta Access Token</CardTitle>
+            <CardTitle>Meta Access Token (Manual Setup)</CardTitle>
             <CardDescription>
-              One token powers both Instagram and Facebook. Get yours from the{" "}
+              Advanced: Use this if you prefer manual token setup. Get yours from the{" "}
               <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                 Graph API Explorer
               </a>. Needs <code className="text-xs">instagram_basic</code>, <code className="text-xs">pages_show_list</code>, and <code className="text-xs">pages_read_engagement</code> permissions.
@@ -103,14 +180,14 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Instagram */}
+        {/* Instagram - MANUAL METHOD */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <span className="text-instagram">Instagram</span> Configuration
+              <span className="text-instagram">Instagram</span> Configuration (Manual)
             </CardTitle>
             <CardDescription>
-              Enter your Instagram Business Account ID. Find it via the{" "}
+              Advanced: Enter your Instagram Business Account ID. Find it via the{" "}
               <a href="https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Faccounts%7Binstagram_business_account%7D" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                 Graph API Explorer
               </a>{" "}
@@ -128,14 +205,14 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Facebook */}
+        {/* Facebook - MANUAL METHOD */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <span className="text-facebook">Facebook</span> Configuration
+              <span className="text-facebook">Facebook</span> Configuration (Manual)
             </CardTitle>
             <CardDescription>
-              Enter your Facebook Page ID. Find it on your Page → About → Page ID, or query <code className="text-xs">/me/accounts</code> in the Graph API Explorer.
+              Advanced: Enter your Facebook Page ID. Find it on your Page → About → Page ID, or query <code className="text-xs">/me/accounts</code> in the Graph API Explorer.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

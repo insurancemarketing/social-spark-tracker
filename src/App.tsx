@@ -8,10 +8,12 @@ import ContentTracker from "./pages/ContentTracker";
 import DMPipeline from "./pages/DMPipeline";
 import YouTubePage from "./pages/YouTubePage";
 import YouTubeCallback from "./pages/YouTubeCallback";
+import FacebookCallback from "./pages/FacebookCallback";
 import TikTokPage from "./pages/TikTokPage";
 import InstagramPage from "./pages/InstagramPage";
 import FacebookPage from "./pages/FacebookPage";
 import Settings from "./pages/Settings";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,10 +30,12 @@ const App = () => (
           <Route path="/dm-pipeline" element={<DMPipeline />} />
           <Route path="/youtube" element={<YouTubePage />} />
           <Route path="/youtube/callback" element={<YouTubeCallback />} />
+          <Route path="/facebook/callback" element={<FacebookCallback />} />
           <Route path="/tiktok" element={<TikTokPage />} />
           <Route path="/instagram" element={<InstagramPage />} />
           <Route path="/facebook" element={<FacebookPage />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
