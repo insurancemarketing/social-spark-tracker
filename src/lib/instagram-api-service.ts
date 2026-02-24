@@ -1,5 +1,30 @@
 // Instagram API Service - Fetch posts and analytics
 import { getFacebookTokens } from './facebook-oauth-simple'
+import { getMetaAccessToken, getInstagramAccountId } from './meta-api'
+
+// Helper to get tokens from either OAuth (database) or manual (localStorage)
+async function getTokensAndAccountId() {
+  // Try OAuth first
+  const oauthTokens = await getFacebookTokens()
+  if (oauthTokens && oauthTokens.instagram_business_account_id) {
+    return {
+      accessToken: oauthTokens.page_access_token || oauthTokens.access_token,
+      instagramAccountId: oauthTokens.instagram_business_account_id
+    }
+  }
+
+  // Fall back to manual localStorage
+  const manualToken = getMetaAccessToken()
+  const manualIgId = getInstagramAccountId()
+  if (manualToken && manualIgId) {
+    return {
+      accessToken: manualToken,
+      instagramAccountId: manualIgId
+    }
+  }
+
+  return null
+}
 
 export interface InstagramPost {
   id: string
@@ -36,14 +61,14 @@ export interface InstagramProfile {
 
 export async function fetchInstagramProfile(): Promise<InstagramProfile | null> {
   try {
-    const tokens = await getFacebookTokens()
-    if (!tokens || !tokens.instagram_business_account_id) {
+    const tokens = await getTokensAndAccountId()
+    if (!tokens) {
       console.log('No Instagram Business Account found')
       return null
     }
 
-    const igAccountId = tokens.instagram_business_account_id
-    const accessToken = tokens.page_access_token || tokens.access_token
+    const igAccountId = tokens.instagramAccountId
+    const accessToken = tokens.accessToken
 
     const response = await fetch(
       `https://graph.facebook.com/v18.0/${igAccountId}?fields=id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url&access_token=${accessToken}`
@@ -74,13 +99,13 @@ export async function fetchInstagramProfile(): Promise<InstagramProfile | null> 
 
 export async function fetchInstagramPosts(limit: number = 25): Promise<InstagramPost[]> {
   try {
-    const tokens = await getFacebookTokens()
-    if (!tokens || !tokens.instagram_business_account_id) {
+    const tokens = await getTokensAndAccountId()
+    if (!tokens) {
       return []
     }
 
-    const igAccountId = tokens.instagram_business_account_id
-    const accessToken = tokens.page_access_token || tokens.access_token
+    const igAccountId = tokens.instagramAccountId
+    const accessToken = tokens.accessToken
 
     const response = await fetch(
       `https://graph.facebook.com/v18.0/${igAccountId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,username&limit=${limit}&access_token=${accessToken}`
@@ -111,10 +136,10 @@ export async function fetchInstagramPosts(limit: number = 25): Promise<Instagram
 
 export async function fetchPostInsights(postId: string): Promise<InstagramInsights | null> {
   try {
-    const tokens = await getFacebookTokens()
+    const tokens = await getTokensAndAccountId()
     if (!tokens) return null
 
-    const accessToken = tokens.page_access_token || tokens.access_token
+    const accessToken = tokens.accessToken
 
     // Fetch insights for the post
     const response = await fetch(
@@ -157,13 +182,13 @@ export async function fetchAccountInsights(period: 'day' | 'week' | 'days_28' = 
   profileViews: number
 } | null> {
   try {
-    const tokens = await getFacebookTokens()
-    if (!tokens || !tokens.instagram_business_account_id) {
+    const tokens = await getTokensAndAccountId()
+    if (!tokens) {
       return null
     }
 
-    const igAccountId = tokens.instagram_business_account_id
-    const accessToken = tokens.page_access_token || tokens.access_token
+    const igAccountId = tokens.instagramAccountId
+    const accessToken = tokens.accessToken
 
     const response = await fetch(
       `https://graph.facebook.com/v18.0/${igAccountId}/insights?metric=impressions,reach,follower_count,profile_views&period=${period}&access_token=${accessToken}`
