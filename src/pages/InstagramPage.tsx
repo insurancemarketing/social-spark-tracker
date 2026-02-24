@@ -13,6 +13,7 @@ import {
   InstagramProfile,
 } from "@/lib/instagram-api-service";
 import { isAuthenticated } from "@/lib/facebook-oauth-simple";
+import { getMetaAccessToken, getInstagramAccountId } from "@/lib/meta-api";
 import { Eye, Users, TrendingUp, Heart, MessageCircle, Bookmark, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -31,7 +32,12 @@ export default function InstagramPage() {
 
   const checkAuthAndLoadData = async () => {
     try {
-      const connected = await isAuthenticated();
+      // Check BOTH OAuth (database) AND manual (localStorage) authentication
+      const oauthConnected = await isAuthenticated();
+      const manualToken = getMetaAccessToken();
+      const manualIgId = getInstagramAccountId();
+      const connected = oauthConnected || (manualToken && manualIgId);
+
       setIsConnected(connected);
 
       if (connected) {
