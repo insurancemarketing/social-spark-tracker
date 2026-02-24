@@ -10,17 +10,26 @@ import {
   getInstagramAccountId, setInstagramAccountId,
   getFacebookPageId, setFacebookPageId,
 } from "@/lib/meta-api";
-import { Check, Key, Hash, Facebook, Instagram } from "lucide-react";
+import { Check, Key, Hash, Facebook, Instagram, Copy } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { initiateFacebookAuth, isAuthenticated, getPageInfo, disconnectFacebook } from "@/lib/facebook-oauth-simple";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Settings() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // YouTube
   const [apiKey, setApiKey] = useState(getYouTubeApiKey() || "");
   const [channelId, setChannelId] = useState(getYouTubeChannelId() || "");
+
+  const copyUserId = () => {
+    if (user?.id) {
+      navigator.clipboard.writeText(user.id);
+      toast.success("User ID copied to clipboard!");
+    }
+  };
 
   // Meta (shared token)
   const [metaToken, setMetaToken] = useState(getMetaAccessToken() || "");
@@ -94,6 +103,32 @@ export default function Settings() {
           <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
           <p className="text-sm text-muted-foreground">Configure your API connections</p>
         </div>
+
+        {/* User ID for Make.com */}
+        <Card className="border-2 border-primary/20 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950">
+          <CardHeader>
+            <CardTitle>Your User ID (for Make.com)</CardTitle>
+            <CardDescription>
+              Copy this ID and use it in your Make.com webhook configuration
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Input
+                value={user?.id || ""}
+                readOnly
+                className="font-mono text-sm"
+              />
+              <Button onClick={copyUserId} size="sm">
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use this ID in the <code className="bg-muted px-1 rounded">user_id</code> field when setting up Make.com DM automation
+            </p>
+          </CardContent>
+        </Card>
 
         {/* YouTube */}
         <Card>
