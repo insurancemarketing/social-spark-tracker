@@ -5,11 +5,12 @@ import { DMStatsCard } from "@/components/dm/DMStatsCard";
 import { DMFunnelChart } from "@/components/dm/DMFunnelChart";
 import { ChatStagesChart } from "@/components/dm/ChatStagesChart";
 import { DMEntriesTable } from "@/components/dm/DMEntriesTable";
+import { AutomatedDMsList } from "@/components/dm/AutomatedDMsList";
 import { mockDMEntries, mockDMStats } from "@/lib/dm-mock-data";
 import { DMEntry } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, TrendingUp } from "lucide-react";
+import { MessageSquare, TrendingUp, Zap } from "lucide-react";
 
 export default function DMPipeline() {
   const [entries, setEntries] = useState<DMEntry[]>(mockDMEntries);
@@ -144,11 +145,19 @@ export default function DMPipeline() {
         </div>
 
         {/* Tabs for Entry Form and Table */}
-        <Tabs defaultValue="entries" className="space-y-4">
+        <Tabs defaultValue="automated" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="entries">View Entries</TabsTrigger>
+            <TabsTrigger value="automated">
+              <Zap className="h-4 w-4 mr-2" />
+              Automated DMs
+            </TabsTrigger>
+            <TabsTrigger value="entries">Manual Entries</TabsTrigger>
             <TabsTrigger value="add">Add Entry</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="automated">
+            <AutomatedDMsList />
+          </TabsContent>
 
           <TabsContent value="entries">
             <DMEntriesTable entries={entries} />
