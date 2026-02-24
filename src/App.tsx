@@ -14,6 +14,7 @@ import InstagramPage from "./pages/InstagramPage";
 import FacebookPage from "./pages/FacebookPage";
 import Settings from "./pages/Settings";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import DataDeletion from "./pages/DataDeletion";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/facebook" element={<FacebookPage />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/data-deletion" element={<DataDeletion />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
