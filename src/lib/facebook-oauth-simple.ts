@@ -1,5 +1,6 @@
 // Simplified Facebook/Instagram OAuth - No Edge Function Needed
 import { supabase, ensureAuth } from './supabase'
+import { saveUserSettings } from './user-settings-service'
 
 const FACEBOOK_APP_ID = '1474987804044568'
 const FACEBOOK_REDIRECT_URI = 'https://social.masonvanmeter.com/facebook/callback'
@@ -88,6 +89,17 @@ export async function handleAuthCallback(accessToken: string): Promise<{ success
     if (dbError) {
       console.error('Database error:', dbError)
       throw dbError
+    }
+
+    // Sync tokens into user_settings so Facebook/Instagram pages work automatically
+    try {
+      await saveUserSettings({
+        meta_access_token: pageAccessToken || accessToken,
+        instagram_account_id: instagramBusinessAccountId,
+        facebook_page_id: pages.length > 0 ? pages[0].id : null,
+      })
+    } catch (syncError) {
+      console.warn('Failed to sync tokens to user_settings:', syncError)
     }
 
     return { success: true }

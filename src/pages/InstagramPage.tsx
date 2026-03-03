@@ -34,8 +34,8 @@ export default function InstagramPage() {
     try {
       // Check BOTH OAuth (database) AND manual (localStorage) authentication
       const oauthConnected = await isAuthenticated();
-      const manualToken = getMetaAccessToken();
-      const manualIgId = getInstagramAccountId();
+      const manualToken = await getMetaAccessToken();
+      const manualIgId = await getInstagramAccountId();
       const connected = oauthConnected || (manualToken && manualIgId);
 
       setIsConnected(!!connected);
