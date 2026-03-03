@@ -1,19 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://tkavzevkgavcxsvtizlu.supabase.co'
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrYXZ6ZXZrZ2F2Y3hzdnRpemx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NTk2ODMsImV4cCI6MjA4NzQzNTY4M30.yeazWCYSuAMJYz06mHsRqBxycHfaOO0Nfl5MgeIgUJA'
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase credentials not found. Some features may not work.')
-}
-
-const fallbackSupabaseUrl = 'https://placeholder.supabase.co'
-const fallbackSupabaseAnonKey = 'placeholder-anon-key'
-
-export const supabase = createClient(
-  supabaseUrl || fallbackSupabaseUrl,
-  supabaseAnonKey || fallbackSupabaseAnonKey
-)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Database types
 export interface DMEntry {
