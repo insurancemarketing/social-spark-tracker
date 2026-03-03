@@ -1,10 +1,48 @@
-// Instagram API Service - Fetch posts and analytics
+// Instagram API Service - Routes all calls through metaFetch for auto-refresh
 import { getFacebookTokens } from './facebook-oauth-simple'
 import { getMetaAccessToken, getInstagramAccountId } from './meta-api'
 
+// Re-export metaFetch as a module-level helper
+import { refreshPageToken } from './facebook-oauth-simple'
+
+const BASE_URL = 'https://graph.facebook.com/v22.0'
+
+// Shared fetch with auto-refresh on 190 errors (mirrors meta-api.ts logic)
+async function igFetch(
+  endpoint: string,
+  params: Record<string, string> = {},
+  tokenOverride?: string,
+  _isRetry = false
+) {
+  const tokens = await getTokensAndAccountId()
+  const token = tokenOverride || tokens?.accessToken
+  if (!token) throw new Error('No Instagram/Meta access token available')
+
+  const url = new URL(`${BASE_URL}/${endpoint}`)
+  url.searchParams.set('access_token', token)
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+
+  const res = await fetch(url.toString())
+  const data = await res.json()
+
+  if (data.error) {
+    // Auto-refresh on expired token (code 190) — retry once
+    if (data.error.code === 190 && !_isRetry) {
+      console.log('[igFetch] Token expired (190), attempting auto-refresh...')
+      const freshToken = await refreshPageToken()
+      if (freshToken) {
+        console.log('[igFetch] Refresh succeeded, retrying request...')
+        return igFetch(endpoint, params, freshToken, true)
+      }
+    }
+    throw new Error(`Instagram API: ${data.error.message}`)
+  }
+
+  return data
+}
+
 // Helper to get tokens from either OAuth (database) or manual (localStorage)
 async function getTokensAndAccountId() {
-  // Try OAuth first
   const oauthTokens = await getFacebookTokens()
   if (oauthTokens && oauthTokens.instagram_business_account_id) {
     return {
@@ -13,14 +51,10 @@ async function getTokensAndAccountId() {
     }
   }
 
-  // Fall back to manual (user_settings in Supabase)
   const manualToken = await getMetaAccessToken()
   const manualIgId = await getInstagramAccountId()
   if (manualToken && manualIgId) {
-    return {
-      accessToken: manualToken,
-      instagramAccountId: manualIgId
-    }
+    return { accessToken: manualToken, instagramAccountId: manualIgId }
   }
 
   return null
@@ -43,7 +77,7 @@ export interface InstagramInsights {
   postId: string
   impressions: number
   reach: number
-  engagement: number // likes + comments + saves
+  engagement: number
   likes: number
   comments: number
   saves: number
@@ -64,23 +98,13 @@ export interface InstagramProfile {
 export async function fetchInstagramProfile(): Promise<InstagramProfile | null> {
   const tokens = await getTokensAndAccountId()
   if (!tokens) {
-    console.warn('No Instagram credentials found (neither OAuth nor manual)')
+    console.warn('No Instagram credentials found')
     return null
   }
 
-  const igAccountId = tokens.instagramAccountId
-  const accessToken = tokens.accessToken
-
-  const response = await fetch(
-    `https://graph.facebook.com/v22.0/${igAccountId}?fields=id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url&access_token=${accessToken}`
-  )
-
-  const data = await response.json()
-
-  if (data.error) {
-    console.error('Instagram API error:', data.error.message, '| Code:', data.error.code, '| Subcode:', data.error.error_subcode)
-    throw new Error(`Instagram API: ${data.error.message}`)
-  }
+  const data = await igFetch(tokens.instagramAccountId, {
+    fields: 'id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url',
+  }, tokens.accessToken)
 
   return {
     id: data.id,
@@ -97,23 +121,12 @@ export async function fetchInstagramProfile(): Promise<InstagramProfile | null> 
 export async function fetchInstagramPosts(limit: number = 25): Promise<InstagramPost[]> {
   try {
     const tokens = await getTokensAndAccountId()
-    if (!tokens) {
-      return []
-    }
+    if (!tokens) return []
 
-    const igAccountId = tokens.instagramAccountId
-    const accessToken = tokens.accessToken
-
-    const response = await fetch(
-      `https://graph.facebook.com/v22.0/${igAccountId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,username,like_count,comments_count&limit=${limit}&access_token=${accessToken}`
-    )
-
-    const data = await response.json()
-
-    if (data.error) {
-      console.error('Instagram API error:', data.error)
-      return []
-    }
+    const data = await igFetch(`${tokens.instagramAccountId}/media`, {
+      fields: 'id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,username,like_count,comments_count',
+      limit: String(limit),
+    }, tokens.accessToken)
 
     return (data.data || []).map((post: any) => ({
       id: post.id,
@@ -138,22 +151,11 @@ export async function fetchPostInsights(postId: string): Promise<InstagramInsigh
     const tokens = await getTokensAndAccountId()
     if (!tokens) return null
 
-    const accessToken = tokens.accessToken
-
-    // Fetch insights for the post (engagement metric was deprecated — calculate from components)
-    const response = await fetch(
-      `https://graph.facebook.com/v22.0/${postId}/insights?metric=impressions,reach,saved,likes,comments,shares&access_token=${accessToken}`
-    )
-
-    const data = await response.json()
-
-    if (data.error) {
-      console.error('Instagram insights error:', data.error)
-      return null
-    }
+    const data = await igFetch(`${postId}/insights`, {
+      metric: 'impressions,reach,saved,likes,comments,shares',
+    }, tokens.accessToken)
 
     const insights: any = {}
-
     data.data?.forEach((metric: any) => {
       insights[metric.name] = metric.values?.[0]?.value || 0
     })
@@ -168,10 +170,7 @@ export async function fetchPostInsights(postId: string): Promise<InstagramInsigh
       impressions: insights.impressions || 0,
       reach: insights.reach || 0,
       engagement: likes + comments + saves,
-      likes,
-      comments,
-      saves,
-      shares,
+      likes, comments, saves, shares,
     }
   } catch (error) {
     console.error('Error fetching post insights:', error)
@@ -187,26 +186,14 @@ export async function fetchAccountInsights(period: 'day' | 'week' | 'days_28' = 
 } | null> {
   try {
     const tokens = await getTokensAndAccountId()
-    if (!tokens) {
-      return null
-    }
+    if (!tokens) return null
 
-    const igAccountId = tokens.instagramAccountId
-    const accessToken = tokens.accessToken
-
-    const response = await fetch(
-      `https://graph.facebook.com/v22.0/${igAccountId}/insights?metric=impressions,reach,follower_count,profile_views&period=${period}&access_token=${accessToken}`
-    )
-
-    const data = await response.json()
-
-    if (data.error) {
-      console.error('Account insights error:', data.error)
-      return null
-    }
+    const data = await igFetch(`${tokens.instagramAccountId}/insights`, {
+      metric: 'impressions,reach,follower_count,profile_views',
+      period,
+    }, tokens.accessToken)
 
     const insights: any = {}
-
     data.data?.forEach((metric: any) => {
       insights[metric.name] = metric.values?.[0]?.value || 0
     })

@@ -9,9 +9,11 @@ import { AutomatedDMsList } from "@/components/dm/AutomatedDMsList";
 import { DMEntry, DMStats } from "@/lib/types";
 import { fetchDMEntries, addDMEntry, calculateDMStats } from "@/lib/dm-service";
 import { getDMStats } from "@/lib/automated-dms-service";
+import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, TrendingUp, Loader2, Instagram, Facebook } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { MessageSquare, TrendingUp, Loader2, Instagram, Facebook, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function DMPipeline() {
@@ -19,7 +21,30 @@ export default function DMPipeline() {
   const [stats, setStats] = useState<DMStats[]>([]);
   const [automatedStats, setAutomatedStats] = useState({ total: 0, new: 0, responded: 0, archived: 0, instagram: 0, facebook: 0 });
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
+
+  const handleSyncDMs = async () => {
+    try {
+      setSyncing(true);
+      const { data, error } = await supabase.functions.invoke('poll-instagram-dms');
+      if (error) throw error;
+      toast({
+        title: "DMs Synced!",
+        description: `Checked ${data.conversations_checked} conversations, synced ${data.messages_synced} new messages.`,
+      });
+      await loadData();
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast({
+        title: "Sync Failed",
+        description: error.message || "Could not sync Instagram DMs. Make sure your account is connected with messaging permissions.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Load entries on mount
   useEffect(() => {
@@ -99,6 +124,10 @@ export default function DMPipeline() {
             <h1 className="text-2xl font-bold tracking-tight">DM Pipeline Tracker</h1>
             <p className="text-sm text-muted-foreground">Track your Facebook & Instagram outreach progression</p>
           </div>
+          <Button onClick={handleSyncDMs} disabled={syncing} variant="outline" size="sm">
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync DMs Now'}
+          </Button>
         </div>
 
         {/* Chat Flow Reference Card */}
