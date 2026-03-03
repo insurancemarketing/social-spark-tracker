@@ -6,6 +6,9 @@ import { Eye, Users, ThumbsUp, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getFacebookTokens } from "@/lib/facebook-oauth-simple";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -15,10 +18,20 @@ function formatNumber(n: number): string {
 
 export default function FacebookPage() {
   const navigate = useNavigate();
-  const { data: page } = useFacebookPage();
+  const { user } = useAuth();
+  const { data: page, isLoading: pageLoading } = useFacebookPage();
   const { data: posts } = useFacebookPosts();
 
+  // Also check if user has OAuth tokens stored
+  const { data: oauthTokens } = useQuery({
+    queryKey: ["facebook-oauth-tokens", user?.id],
+    queryFn: () => getFacebookTokens(),
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const isLive = !!page;
+  const hasOAuth = !!oauthTokens;
 
   return (
     <AppLayout>
@@ -32,11 +45,15 @@ export default function FacebookPage() {
           </p>
         </div>
 
-        {!isLive && (
+        {!isLive && !pageLoading && (
           <Card className="border-warning/30 bg-warning/5">
             <CardContent className="flex items-center gap-3 py-4">
               <AlertCircle className="h-5 w-5 text-warning" />
-              <p className="text-sm">Connect your Meta access token and Facebook Page ID in Settings to see live data.</p>
+              <p className="text-sm">
+                {hasOAuth
+                  ? "Connected via OAuth but unable to load page data — check console for API errors."
+                  : "Connect your Meta access token and Facebook Page ID in Settings to see live data."}
+              </p>
               <Button size="sm" variant="outline" className="ml-auto" onClick={() => navigate("/settings")}>
                 Go to Settings
               </Button>

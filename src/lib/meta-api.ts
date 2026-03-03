@@ -1,7 +1,7 @@
 import { ContentItem } from "./types";
 import { getUserSettings, saveUserSettings } from "./user-settings-service";
 
-const BASE_URL = "https://graph.facebook.com/v19.0";
+const BASE_URL = "https://graph.facebook.com/v22.0";
 
 // ── Async getters/setters backed by Supabase ──────────────────
 

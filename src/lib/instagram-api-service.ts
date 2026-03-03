@@ -60,40 +60,35 @@ export interface InstagramProfile {
 }
 
 export async function fetchInstagramProfile(): Promise<InstagramProfile | null> {
-  try {
-    const tokens = await getTokensAndAccountId()
-    if (!tokens) {
-      console.log('No Instagram Business Account found')
-      return null
-    }
-
-    const igAccountId = tokens.instagramAccountId
-    const accessToken = tokens.accessToken
-
-    const response = await fetch(
-      `https://graph.facebook.com/v22.0/${igAccountId}?fields=id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url&access_token=${accessToken}`
-    )
-
-    const data = await response.json()
-
-    if (data.error) {
-      console.error('Instagram API error:', data.error)
-      return null
-    }
-
-    return {
-      id: data.id,
-      username: data.username,
-      name: data.name,
-      biography: data.biography || '',
-      followersCount: data.followers_count || 0,
-      followsCount: data.follows_count || 0,
-      mediaCount: data.media_count || 0,
-      profilePictureUrl: data.profile_picture_url,
-    }
-  } catch (error) {
-    console.error('Error fetching Instagram profile:', error)
+  const tokens = await getTokensAndAccountId()
+  if (!tokens) {
+    console.warn('No Instagram credentials found (neither OAuth nor manual)')
     return null
+  }
+
+  const igAccountId = tokens.instagramAccountId
+  const accessToken = tokens.accessToken
+
+  const response = await fetch(
+    `https://graph.facebook.com/v22.0/${igAccountId}?fields=id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url&access_token=${accessToken}`
+  )
+
+  const data = await response.json()
+
+  if (data.error) {
+    console.error('Instagram API error:', data.error.message, '| Code:', data.error.code, '| Subcode:', data.error.error_subcode)
+    throw new Error(`Instagram API: ${data.error.message}`)
+  }
+
+  return {
+    id: data.id,
+    username: data.username,
+    name: data.name,
+    biography: data.biography || '',
+    followersCount: data.followers_count || 0,
+    followsCount: data.follows_count || 0,
+    mediaCount: data.media_count || 0,
+    profilePictureUrl: data.profile_picture_url,
   }
 }
 
