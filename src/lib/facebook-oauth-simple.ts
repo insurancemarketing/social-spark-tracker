@@ -202,6 +202,12 @@ export async function getFacebookTokens() {
       return null
     }
 
+    // Validate completeness — stale records with no pages/token are useless
+    if (!data.page_access_token || !data.pages || data.pages.length === 0) {
+      console.warn('[FB Auth] Stale token detected (no pages or page_access_token). Treating as disconnected.')
+      return null
+    }
+
     return data
   } catch (error) {
     console.error('Error getting Facebook tokens:', error)
@@ -212,6 +218,25 @@ export async function getFacebookTokens() {
 export async function isAuthenticated(): Promise<boolean> {
   const tokens = await getFacebookTokens()
   return tokens !== null
+}
+
+/**
+ * Check if a facebook_tokens row exists at all (even if stale/incomplete).
+ * Used by Settings to show the "broken connection" warning.
+ */
+export async function hasAnyFacebookRecord(): Promise<boolean> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return false
+    const { data, error } = await supabase
+      .from('facebook_tokens')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    return !!data && !error
+  } catch {
+    return false
+  }
 }
 
 export async function getPageInfo() {
