@@ -5,9 +5,10 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 interface DMFunnelChartProps {
   stats: DMStats[];
+  automatedDMCount?: number;
 }
 
-export function DMFunnelChart({ stats }: DMFunnelChartProps) {
+export function DMFunnelChart({ stats, automatedDMCount = 0 }: DMFunnelChartProps) {
   // Aggregate all platforms
   const combined = stats.reduce(
     (acc, stat) => ({
@@ -28,8 +29,11 @@ export function DMFunnelChart({ stats }: DMFunnelChartProps) {
     }
   );
 
+  // Use automated DM count as fallback for chats started
+  const chatsStarted = combined.chatsStarted > 0 ? combined.chatsStarted : automatedDMCount;
+
   const funnelData = [
-    { stage: "Chats Started", count: combined.chatsStarted, fill: "hsl(var(--chart-1))" },
+    { stage: "Chats Started", count: chatsStarted, fill: "hsl(var(--chart-1))" },
     { stage: "Triage Booked", count: combined.triageBooked, fill: "hsl(var(--chart-2))" },
     { stage: "Triage Show", count: combined.triageShowUp, fill: "hsl(var(--chart-3))" },
     { stage: "Strategy Booked", count: combined.strategyBooked, fill: "hsl(var(--chart-4))" },
@@ -78,7 +82,7 @@ export function DMFunnelChart({ stats }: DMFunnelChartProps) {
           </div>
           <div>
             <div className="text-lg font-semibold text-green-600">
-              {combined.chatsStarted > 0 ? ((combined.wins / combined.chatsStarted) * 100).toFixed(1) : 0}%
+              {chatsStarted > 0 ? ((combined.wins / chatsStarted) * 100).toFixed(1) : 0}%
             </div>
             <p className="text-xs text-muted-foreground">Overall Win Rate</p>
           </div>
