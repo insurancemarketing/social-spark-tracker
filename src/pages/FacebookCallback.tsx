@@ -57,14 +57,23 @@ export default function FacebookCallback() {
 
         throw new Error('No access token or authorization code received from Facebook. Make sure your app permissions and redirect URI are configured correctly.')
       } catch (error) {
-        console.error('Callback error:', error)
+        console.error('Callback error (raw):', error)
         setStatus('error')
-        setErrorMessage(error instanceof Error ? error.message : 'Unknown error occurred')
+        const msg = error instanceof Error
+          ? error.message
+          : typeof error === 'object'
+            ? JSON.stringify(error)
+            : String(error)
+        setErrorMessage(msg)
       }
     }
 
     handleCallback()
   }, [navigate])
+
+  const copyError = () => {
+    navigator.clipboard.writeText(errorMessage)
+  }
 
   return (
     <div className="container mx-auto py-8 flex items-center justify-center min-h-screen">
@@ -87,11 +96,14 @@ export default function FacebookCallback() {
         {status === 'error' && (
           <CardContent className="space-y-4">
             <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-900">
-              <p className="text-sm text-red-800 dark:text-red-200">{errorMessage}</p>
+              <p className="text-sm text-red-800 dark:text-red-200 break-words whitespace-pre-wrap">{errorMessage}</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate('/settings')}>
                 Back to Settings
+              </Button>
+              <Button variant="outline" onClick={copyError}>
+                Copy Error
               </Button>
               <Button onClick={() => navigate('/instagram')}>
                 Try Again
