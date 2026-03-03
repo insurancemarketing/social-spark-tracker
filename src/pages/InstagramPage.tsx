@@ -148,7 +148,7 @@ export default function InstagramPage() {
               <span className="text-instagram">Instagram</span> Analytics
             </h1>
             <p className="text-sm text-muted-foreground">
-              {profile ? `@${profile.username}` : 'Loading...'}
+              {profile ? `@${profile.username}` : 'Could not load profile — check console for details'}
             </p>
           </div>
           <ConnectFacebookButton />
