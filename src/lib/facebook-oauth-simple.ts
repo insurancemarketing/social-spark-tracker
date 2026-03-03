@@ -2,7 +2,7 @@
 import { supabase, ensureAuth } from './supabase'
 import { saveUserSettings } from './user-settings-service'
 
-const FACEBOOK_APP_ID = '1474987804044568'
+const FACEBOOK_APP_ID = '2064832031041409'
 const FACEBOOK_REDIRECT_URI = 'https://social.masonvanmeter.com/facebook/callback'
 
 // Facebook OAuth scopes for Instagram Business API
