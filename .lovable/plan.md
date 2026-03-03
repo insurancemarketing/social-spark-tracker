@@ -1,32 +1,51 @@
 
 
-# Auto-Refresh Meta Tokens So It Never Breaks
+# Fix Instagram Token Refresh + Enable DM Tracking
 
-## Problem
-`metaFetch()` always reads the token from `user_settings.meta_access_token`, which is a page token that expires. Meanwhile, `useFacebookData.ts` resolves a fresh token from `facebook_tokens` but never passes it to the fetch functions -- they ignore it and read the stale one from `user_settings`.
+## Two Problems Found
 
-## Fix (Two Parts)
+### Problem 1: Instagram page is broken (token expired again)
+The auto-refresh we built in `metaFetch()` works -- but `InstagramPage.tsx` doesn't use it. It calls `instagram-api-service.ts` which makes **raw `fetch()` calls** directly to the Graph API, completely bypassing `metaFetch` and its auto-refresh logic. So the expired page token is never refreshed for the Instagram page.
 
-### 1. Pass token through instead of always reading from DB (`src/lib/meta-api.ts`)
-- Add an optional `tokenOverride` parameter to `metaFetch()` so callers can pass a token directly
-- Add the same optional `token` parameter to `fetchFacebookPage`, `fetchFacebookPosts`, `fetchInstagramProfile`, `fetchInstagramMedia`
-- When provided, use it instead of reading from `user_settings`
-- On a 190 error (expired token), attempt auto-refresh: call `/me/accounts` with the long-lived user token from `facebook_tokens`, get a fresh page token, update both `facebook_tokens.page_access_token` and `user_settings.meta_access_token`, then retry the original request once
+### Problem 2: Instagram DMs aren't tracked
+Three things are missing:
+1. **OAuth scopes**: The login flow requests `instagram_basic`, `instagram_manage_insights`, etc. but does NOT request `instagram_manage_messages` -- the permission Meta requires to receive DM webhooks.
+2. **Webhook not registered**: The `dm-webhook` edge function exists but its URL needs to be registered in your Meta App Dashboard under Webhooks with the `messages` subscription.
+3. **Outbound DMs**: Meta webhooks only deliver inbound messages. To track messages *you* send, we need a polling mechanism that periodically calls the Instagram Conversations API to fetch recent threads.
 
-### 2. Update hooks to pass resolved token (`src/hooks/useFacebookData.ts`, `src/hooks/useInstagramData.ts`)
-- `useFacebookData.ts`: pass `creds.token` to `fetchFacebookPage(pageId, token)` and `fetchFacebookPosts(pageId, limit, token)`
-- `useInstagramData.ts`: resolve token from `facebook_tokens` first (like `useFacebookData` does), pass it to `fetchInstagramProfile` and `fetchInstagramMedia`
+## Plan
 
-### 3. Add `refreshPageToken()` to `src/lib/facebook-oauth-simple.ts`
-- Export a function that reads the long-lived `access_token` from `facebook_tokens`, calls `https://graph.facebook.com/v22.0/me/accounts`, gets a fresh page token, and updates both DB tables
-- This is called automatically by `metaFetch` on 190 errors -- no manual action needed
+### 1. Fix Instagram auto-refresh (`src/lib/instagram-api-service.ts`)
+- Replace all raw `fetch()` calls with calls to `metaFetch` from `meta-api.ts` (which already handles 190 errors and auto-refreshes)
+- This fixes the "Session has expired" error on the Instagram page without duplicating refresh logic
+
+### 2. Add messaging permission to OAuth flow (`src/lib/facebook-oauth-simple.ts`)
+- Add `instagram_manage_messages` to the `FACEBOOK_SCOPES` list
+- This will prompt the user to grant messaging access on next reconnect, enabling DM webhooks
+
+### 3. Create a DM polling edge function (`supabase/functions/poll-instagram-dms/index.ts`)
+- New edge function that uses the stored page access token to call the Instagram Conversations API (`/{ig-account-id}/conversations` and `/{conversation-id}/messages`)
+- Fetches both inbound and outbound messages from recent conversations
+- Inserts any new messages into `automated_dms` (deduplicating by `message_id`)
+- Can be triggered manually from the UI or scheduled via cron
+
+### 4. Add "Sync DMs" button to the DM Pipeline page (`src/pages/DMPipelineWithSupabase.tsx`)
+- Add a "Sync DMs Now" button that invokes the `poll-instagram-dms` edge function
+- Shows a loading state while syncing
+- Refreshes the DM list after sync completes
+
+### 5. User setup step (no code -- manual action)
+After reconnecting Facebook with the new permissions, you'll need to:
+- Go to Meta App Dashboard > Webhooks
+- Subscribe to `messages` field for your Instagram account
+- Set the callback URL to your `dm-webhook` edge function URL
 
 ## File Summary
 
 | File | Change |
 |------|--------|
-| `src/lib/meta-api.ts` | Add token passthrough to `metaFetch` and all fetch functions; auto-refresh on 190 error |
-| `src/lib/facebook-oauth-simple.ts` | Add `refreshPageToken()` that uses long-lived token to get fresh page token |
-| `src/hooks/useFacebookData.ts` | Pass resolved token to fetch functions |
-| `src/hooks/useInstagramData.ts` | Resolve token from `facebook_tokens` first, pass to fetch functions |
+| `src/lib/instagram-api-service.ts` | Route all API calls through `metaFetch` for auto-refresh |
+| `src/lib/facebook-oauth-simple.ts` | Add `instagram_manage_messages` to OAuth scopes |
+| `supabase/functions/poll-instagram-dms/index.ts` | New edge function to poll conversations API for inbound + outbound DMs |
+| `src/pages/DMPipelineWithSupabase.tsx` | Add "Sync DMs Now" button to trigger polling |
 
