@@ -5,16 +5,19 @@ import { DMStatsCard } from "@/components/dm/DMStatsCard";
 import { DMFunnelChart } from "@/components/dm/DMFunnelChart";
 import { ChatStagesChart } from "@/components/dm/ChatStagesChart";
 import { DMEntriesTable } from "@/components/dm/DMEntriesTable";
+import { AutomatedDMsList } from "@/components/dm/AutomatedDMsList";
 import { DMEntry, DMStats } from "@/lib/types";
 import { fetchDMEntries, addDMEntry, calculateDMStats } from "@/lib/dm-service";
+import { getDMStats } from "@/lib/automated-dms-service";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MessageSquare, TrendingUp, Loader2 } from "lucide-react";
+import { MessageSquare, TrendingUp, Loader2, Instagram, Facebook } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function DMPipeline() {
   const [entries, setEntries] = useState<DMEntry[]>([]);
   const [stats, setStats] = useState<DMStats[]>([]);
+  const [automatedStats, setAutomatedStats] = useState({ total: 0, new: 0, responded: 0, archived: 0, instagram: 0, facebook: 0 });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -26,12 +29,14 @@ export default function DMPipeline() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [entriesData, statsData] = await Promise.all([
+      const [entriesData, statsData, autoStats] = await Promise.all([
         fetchDMEntries(),
         calculateDMStats(),
+        getDMStats(),
       ]);
       setEntries(entriesData);
       setStats(statsData);
+      setAutomatedStats(autoStats);
     } catch (error) {
       console.error('Error loading DM data:', error);
       toast({
@@ -70,7 +75,8 @@ export default function DMPipeline() {
   // Calculate overall totals
   const totalChatsStarted = entries.reduce((sum, e) => sum + e.chatsStarted, 0);
   const totalWins = entries.reduce((sum, e) => sum + e.wins, 0);
-  const overallWinRate = totalChatsStarted > 0 ? (totalWins / totalChatsStarted) * 100 : 0;
+  const effectiveChats = totalChatsStarted || automatedStats.total;
+  const overallWinRate = effectiveChats > 0 ? (totalWins / effectiveChats) * 100 : 0;
 
   if (loading) {
     return (
@@ -141,13 +147,13 @@ export default function DMPipeline() {
 
         {/* Overall Stats */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
+        <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Chats Started</CardTitle>
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalChatsStarted}</div>
+              <div className="text-2xl font-bold">{totalChatsStarted || automatedStats.total}</div>
               <p className="text-xs text-muted-foreground">All platforms combined</p>
             </CardContent>
           </Card>
@@ -165,25 +171,23 @@ export default function DMPipeline() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overall Win Rate</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Instagram DMs</CardTitle>
+              <Instagram className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{overallWinRate.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">Conversion rate</p>
+              <div className="text-2xl font-bold">{automatedStats.instagram}</div>
+              <p className="text-xs text-muted-foreground">Received via automation</p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Goal: 10% Win Rate</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-600" />
+              <CardTitle className="text-sm font-medium">Facebook DMs</CardTitle>
+              <Facebook className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {overallWinRate >= 10 ? "✅ Crushing it!" : `${(10 - overallWinRate).toFixed(1)}% to go`}
-              </div>
-              <p className="text-xs text-muted-foreground">Track your progress</p>
+              <div className="text-2xl font-bold">{automatedStats.facebook}</div>
+              <p className="text-xs text-muted-foreground">Received via automation</p>
             </CardContent>
           </Card>
         </div>
@@ -197,16 +201,21 @@ export default function DMPipeline() {
 
         {/* Charts */}
         <div className="grid gap-4 lg:grid-cols-2">
-          <DMFunnelChart stats={stats} />
-          <ChatStagesChart entries={entries} />
+          <DMFunnelChart stats={stats} automatedDMCount={automatedStats.total} />
+          <ChatStagesChart entries={entries} automatedStats={automatedStats} />
         </div>
 
         {/* Tabs for Entry Form and Table */}
-        <Tabs defaultValue="entries" className="space-y-4">
+        <Tabs defaultValue="automated" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="entries">View Entries</TabsTrigger>
+            <TabsTrigger value="automated">Automated DMs</TabsTrigger>
+            <TabsTrigger value="entries">Manual Entries</TabsTrigger>
             <TabsTrigger value="add">Add Entry</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="automated">
+            <AutomatedDMsList />
+          </TabsContent>
 
           <TabsContent value="entries">
             {entries.length === 0 ? (

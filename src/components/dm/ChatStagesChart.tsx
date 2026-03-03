@@ -3,13 +3,20 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { DMEntry } from "@/lib/types";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 
-interface ChatStagesChartProps {
-  entries: DMEntry[];
+interface AutomatedStats {
+  new: number;
+  responded: number;
+  archived: number;
 }
 
-export function ChatStagesChart({ entries }: ChatStagesChartProps) {
+interface ChatStagesChartProps {
+  entries: DMEntry[];
+  automatedStats?: AutomatedStats;
+}
+
+export function ChatStagesChart({ entries, automatedStats }: ChatStagesChartProps) {
   // Aggregate stage data across all entries
-  const stageData = entries.reduce(
+  const manualStageData = entries.reduce(
     (acc, entry) => ({
       connect: acc.connect + entry.connectStage,
       qualify: acc.qualify + entry.qualifyStage,
@@ -17,6 +24,15 @@ export function ChatStagesChart({ entries }: ChatStagesChartProps) {
     }),
     { connect: 0, qualify: 0, convert: 0 }
   );
+
+  const manualTotal = manualStageData.connect + manualStageData.qualify + manualStageData.convert;
+
+  // Fall back to automated DM statuses when no manual data
+  const stageData = manualTotal > 0
+    ? manualStageData
+    : automatedStats
+      ? { connect: automatedStats.new, qualify: automatedStats.responded, convert: automatedStats.archived }
+      : manualStageData;
 
   const chartData = [
     { name: "CONNECT", value: stageData.connect, fill: "#3b82f6" },
