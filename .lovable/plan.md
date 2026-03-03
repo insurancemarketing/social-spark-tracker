@@ -1,35 +1,24 @@
 
 
-# Deploy dm-webhook Edge Function
+# Sync dm-webhook codebase with deployed version
 
 ## Problem
-The `dm-webhook` edge function exists in the codebase but was never deployed. Connecting Supabase to Lovable enables future auto-deploys, but existing functions need a code change to trigger their first deployment.
+The deployed `dm-webhook` edge function on Supabase has additional functionality not reflected in the codebase — specifically a `getSenderInfo` helper that fetches real Facebook user names via the Graph API using `FB_PAGE_ACCESS_TOKEN`.
 
-## Solution
-Make a minor update to the edge function to trigger Lovable's auto-deploy. I will also update the CORS headers to match the recommended pattern.
-
-## File Changes
+## Changes
 
 | File | Change |
 |------|--------|
-| `supabase/functions/dm-webhook/index.ts` | Update CORS `Access-Control-Allow-Headers` to include Supabase client headers (triggers deploy) |
+| `supabase/functions/dm-webhook/index.ts` | Replace with the deployed version: add `PAGE_ACCESS_TOKEN` env var, add `getSenderInfo()` function, update Facebook message handler to use it |
 
-The only change is updating line 6 from:
-```
-'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret, x-hub-signature',
-```
-to:
-```
-'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret, x-hub-signature, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-```
+Key differences from current codebase:
+1. Adds `const PAGE_ACCESS_TOKEN = Deno.env.get('FB_PAGE_ACCESS_TOKEN')` 
+2. Adds `getSenderInfo(senderId)` function that calls Graph API `/v18.0/{senderId}?fields=name,first_name,last_name`
+3. Facebook messaging handler calls `getSenderInfo` instead of hardcoding sender name
+4. CORS headers revert to the simpler set (matching deployed version)
 
-## After Deployment
-
-Once deployed, I will verify the endpoint is live by hitting the verification URL. Then you can go to the **Meta App Dashboard** and complete the webhook setup:
-
-1. Go to **Webhooks** product in your Meta App
-2. Set **Callback URL** to: `https://tkavzevkgavcxsvtizlu.supabase.co/functions/v1/dm-webhook`
-3. Set **Verify Token** to: `social_spark_tracker_2024`
-4. Click **Verify and Save**
-5. Subscribe to the `messages` field under `instagram` or `page`
+## Next Steps
+Since the webhook is already deployed and live, after syncing the code I can help you:
+- Set up a Make.com scenario to forward Instagram DMs to this webhook
+- Or test the webhook directly with Meta's webhook subscription
 
