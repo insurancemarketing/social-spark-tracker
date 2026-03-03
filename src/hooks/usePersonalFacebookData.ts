@@ -5,8 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 
 async function resolveUserToken(): Promise<string | null> {
   const oauthTokens = await getFacebookTokens();
-  // Use the user access token (not page token) for personal profile
-  return oauthTokens?.access_token || null;
+  const token = oauthTokens?.access_token || null;
+  console.log('[FB Personal] User token resolved:', token ? 'yes' : 'no', 'page_token differs:', token !== oauthTokens?.page_access_token);
+  return token;
 }
 
 export function usePersonalFacebookProfile() {
