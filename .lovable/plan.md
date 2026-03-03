@@ -1,38 +1,47 @@
 
 
-# Fix: Clean Up Stale OAuth State and Improve Settings UI
+# Fix Dashboard, Facebook Page Tracking, and Instagram Metrics
 
-## Problem
-The `facebook_tokens` table has a stale record with `pages: []` from a previous connection before our validation fix. The Settings page doesn't handle this "connected but broken" state well — it shows the Connect button instead of showing the user they need to disconnect and reconnect.
+## Three Issues to Address
 
-## Changes
+### 1. Dashboard is static -- needs to show real data
+The Dashboard page (`src/pages/Dashboard.tsx`) is currently a hardcoded placeholder that just says "Connect Your Platforms." Now that Facebook/Instagram are connected, it should pull in real summary data from all connected platforms.
 
-### 1. Fix Settings page to handle stale OAuth state (`src/pages/Settings.tsx`)
-- When `isFbConnected` is true but `fbPageInfo` is null, show a warning state:
-  - "Connected but no Facebook Page was shared. Please disconnect and reconnect, making sure to select your Page."
-  - Show both Disconnect and Reconnect buttons
-- This replaces the current behavior where it silently falls through to the Connect button
+**Changes to `src/pages/Dashboard.tsx`:**
+- Import and use `useFacebookPage`, `useFacebookPosts` from `useFacebookData`
+- Import and use `useInstagramProfile` from `useInstagramData`
+- Import and use `useYouTubeChannel` from `useYouTubeData`
+- Show a grid of StatsCards with real numbers: total followers across platforms, total posts, engagement stats
+- Show a per-platform summary section (YouTube subscribers, Instagram followers, Facebook fans)
+- Keep the "Connect Your Platforms" card only for platforms that aren't connected yet
 
-### 2. Add auto-cleanup for stale tokens (`src/lib/facebook-oauth-simple.ts`)
-- In `isAuthenticated()`, also check that the token has non-empty `pages` array
-- If pages is empty, return `false` — the connection is effectively broken
-- This prevents the Instagram page from thinking it's connected when it has no usable credentials
+### 2. Facebook Page -- personal page tracking via public fields
+The current `fetchFacebookPage` requests `followers_count` and `fan_count`, which require Page-level permissions. For a personal Facebook profile (not a Page), these fields aren't available the same way.
 
-### 3. Update `getFacebookTokens()` to validate completeness
-- After fetching the token, check if `page_access_token` is null or `pages` is empty
-- If so, log a warning and return null — forcing the user to reconnect
-- This makes all downstream consumers (Instagram page, Facebook page) correctly show "not connected"
+**The fix:** The user already connected via OAuth and has a **Page** (Business Manager). The `useFacebookData` hook already resolves credentials from OAuth tokens. The issue is that `fetchFacebookPosts` only fetches `message, created_time, shares` -- it doesn't fetch `likes` or `comments` counts, so the ContentTable shows 0 for those.
 
-## Technical Details
+**Changes to `src/lib/meta-api.ts`:**
+- Update `fetchFacebookPosts` to also request `likes.summary(true),comments.summary(true)` fields
+- Map `likes.summary.total_count` and `comments.summary.total_count` into the ContentItem
 
-**`src/lib/facebook-oauth-simple.ts`** changes:
-- `isAuthenticated()`: check `tokens.pages?.length > 0` in addition to token existence
-- `getFacebookTokens()`: return null if `page_access_token` is null (stale record)
+### 3. Instagram metrics not showing on posts
+The Instagram page calls `fetchPostInsights` which requests the metric `engagement` -- but this metric was deprecated in newer Instagram API versions. The API returns an error silently, so `postInsights` is always null and no metrics render.
 
-**`src/pages/Settings.tsx`** changes:
-- Add a third state: `isFbConnected && !fbPageInfo` showing a warning card with Disconnect + Reconnect buttons
+**Changes to `src/lib/instagram-api-service.ts`:**
+- Update `fetchPostInsights` to use the correct metrics for the current API version: `impressions,reach,saved,likes,comments,shares` (remove the deprecated `engagement` metric)
+- Calculate engagement as `likes + comments + saves` from the individual metrics
+- Add error logging to surface which specific metrics fail
 
-## Expected Outcome
-- Settings page clearly shows "broken connection" state with instructions
-- Instagram and Facebook pages correctly show "not connected" instead of loading errors
-- After user disconnects and reconnects (selecting their page), everything works
+**Changes to `src/pages/InstagramPage.tsx`:**
+- Show basic like/comment counts from the post data itself (`post.likeCount`, `post.commentsCount` are not currently mapped but are available from the media endpoint) as a fallback when insights fail
+- Update the posts fetch to include `like_count,comments_count` (already present in the API call but not used in the grid display)
+
+## Summary of File Changes
+
+| File | What Changes |
+|------|-------------|
+| `src/pages/Dashboard.tsx` | Replace static placeholder with real data from YouTube, Instagram, Facebook hooks |
+| `src/lib/meta-api.ts` | Add `likes.summary(true),comments.summary(true)` to Facebook posts query |
+| `src/lib/instagram-api-service.ts` | Remove deprecated `engagement` metric from insights call; calculate from components |
+| `src/pages/InstagramPage.tsx` | Show like/comment counts from post data as fallback when insights are unavailable |
+
