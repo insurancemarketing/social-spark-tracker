@@ -1,61 +1,51 @@
 
 
-# Plan: Fix and Unify Meta OAuth for Facebook + Instagram
+# Fix: Facebook OAuth "Invalid Scopes" Error
 
-## Current State
+## The Problem
 
-You already have a working Facebook OAuth flow (`facebook-oauth-simple.ts`) that:
-- Redirects to Facebook login with the right scopes (pages, instagram, business management)
-- Stores tokens in a `facebook_tokens` table in Supabase
-- Auto-detects the linked Instagram Business Account
+Facebook is rejecting the OAuth request because **the permissions haven't been added to your Facebook App** in the developer dashboard. The error "Invalid Scopes" means the app doesn't recognize those scopes -- they need to be configured in the app settings first. Additionally, the code uses Graph API **v18.0** which is deprecated.
 
-**But there are bugs preventing it from working end-to-end:**
+## What Needs to Happen
 
-1. `instagram-api-service.ts` calls `getMetaAccessToken()` and `getInstagramAccountId()` as **synchronous** functions, but they were changed to **async** (they now query Supabase). This means the fallback path silently fails.
-2. `InstagramPage.tsx` also calls those functions synchronously on line 38-39.
-3. After OAuth completes, the token is stored in `facebook_tokens` but never synced to `user_settings` -- so the Facebook page (which reads from `user_settings`) doesn't see it.
-4. The two data paths (OAuth via `facebook_tokens` table vs manual via `user_settings` table) are disconnected.
+### Step 1: You configure permissions in Facebook Developer Dashboard (manual)
 
-## What This Plan Fixes
+Go to [developers.facebook.com](https://developers.facebook.com), open your app (ID: `1474987804044568`), then:
 
-### 1. Sync OAuth tokens into user_settings automatically
+1. Go to **App Dashboard > Use Cases** (or **Add Product > Facebook Login**)
+2. Under your Facebook Login use case, click **Customize** then **Permissions**
+3. Add these permissions:
+   - `pages_show_list`
+   - `pages_read_engagement`  
+   - `instagram_basic`
+   - `instagram_manage_insights`
+   - `business_management`
+4. Remove `pages_read_user_content` (deprecated -- we'll use `pages_read_engagement` instead which covers post data)
+5. Make sure **Facebook Login** is added as a product and your redirect URI (`https://social.masonvanmeter.com/facebook/callback`) is listed under **Valid OAuth Redirect URIs**
 
-After the OAuth callback stores tokens in `facebook_tokens`, also write the page access token, Instagram account ID, and Facebook page ID into `user_settings`. This means both the Instagram and Facebook pages will "just work" after OAuth login -- no manual token entry needed.
+Since the app is in **Development Mode**, only users with a role on the app (admin/developer/tester) can log in -- which is fine for your use.
 
-**File:** `src/lib/facebook-oauth-simple.ts`
-- In `handleAuthCallback()`, after upserting to `facebook_tokens`, also call `saveUserSettings()` with the meta access token, Instagram account ID, and Facebook page ID.
+### Step 2: Code changes (I will do this)
 
-### 2. Fix async bugs in instagram-api-service.ts
+**File: `src/lib/facebook-oauth-simple.ts`**
+- Update Graph API version from `v18.0` to `v22.0`
+- Remove deprecated scope `pages_read_user_content`
+- Keep the remaining 5 valid scopes
 
-**File:** `src/lib/instagram-api-service.ts`
-- Lines 17-24: `getMetaAccessToken()` and `getInstagramAccountId()` are async but called without `await`. Add `await` to both calls so the fallback path actually works.
+**File: `src/lib/instagram-api-service.ts`**
+- Update Graph API endpoint URLs from `v18.0` to `v22.0`
 
-### 3. Fix async bugs in InstagramPage.tsx
+**File: `src/pages/FacebookCallback.tsx`**  
+- No changes needed (already correct)
 
-**File:** `src/pages/InstagramPage.tsx`
-- Lines 38-39: Same issue -- these are async calls used synchronously. Fix by awaiting them properly inside the existing async function.
+## Summary
 
-### 4. Clean up Settings page
+| Action | Who |
+|--------|-----|
+| Add permissions in Facebook App Dashboard | You (manual) |
+| Update API version to v22.0 | Code change |
+| Remove deprecated `pages_read_user_content` scope | Code change |
+| Update all Graph API URLs to v22.0 | Code change |
 
-**File:** `src/pages/Settings.tsx`
-- Remove the "User ID for Make.com" card (you said to ignore Make.com)
-- Keep the OAuth connect button as the primary method
-- Keep manual fields as a secondary "Advanced" fallback
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `src/lib/facebook-oauth-simple.ts` | Sync OAuth tokens to `user_settings` after login |
-| `src/lib/instagram-api-service.ts` | Fix 2 missing `await` calls |
-| `src/pages/InstagramPage.tsx` | Fix 2 missing `await` calls |
-| `src/pages/Settings.tsx` | Remove Make.com card |
-
-## Result
-
-After this, clicking "Connect Facebook and Instagram" on the Settings page will:
-1. Redirect to Facebook OAuth
-2. Get your Page access token + Instagram Business Account ID
-3. Store everything in both `facebook_tokens` and `user_settings`
-4. Both the Instagram and Facebook analytics pages will load real data automatically
+After both steps, the OAuth flow should work when you click "Connect Facebook and Instagram."
 
