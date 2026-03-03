@@ -35,6 +35,8 @@ export interface InstagramPost {
   timestamp: string
   thumbnailUrl?: string
   username: string
+  likeCount: number
+  commentsCount: number
 }
 
 export interface InstagramInsights {
@@ -103,7 +105,7 @@ export async function fetchInstagramPosts(limit: number = 25): Promise<Instagram
     const accessToken = tokens.accessToken
 
     const response = await fetch(
-      `https://graph.facebook.com/v22.0/${igAccountId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,username&limit=${limit}&access_token=${accessToken}`
+      `https://graph.facebook.com/v22.0/${igAccountId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,username,like_count,comments_count&limit=${limit}&access_token=${accessToken}`
     )
 
     const data = await response.json()
@@ -122,6 +124,8 @@ export async function fetchInstagramPosts(limit: number = 25): Promise<Instagram
       timestamp: post.timestamp,
       thumbnailUrl: post.thumbnail_url,
       username: post.username,
+      likeCount: post.like_count || 0,
+      commentsCount: post.comments_count || 0,
     }))
   } catch (error) {
     console.error('Error fetching Instagram posts:', error)
@@ -136,9 +140,9 @@ export async function fetchPostInsights(postId: string): Promise<InstagramInsigh
 
     const accessToken = tokens.accessToken
 
-    // Fetch insights for the post
+    // Fetch insights for the post (engagement metric was deprecated — calculate from components)
     const response = await fetch(
-      `https://graph.facebook.com/v22.0/${postId}/insights?metric=impressions,reach,engagement,saved,likes,comments&access_token=${accessToken}`
+      `https://graph.facebook.com/v22.0/${postId}/insights?metric=impressions,reach,saved,likes,comments,shares&access_token=${accessToken}`
     )
 
     const data = await response.json()
@@ -154,15 +158,20 @@ export async function fetchPostInsights(postId: string): Promise<InstagramInsigh
       insights[metric.name] = metric.values?.[0]?.value || 0
     })
 
+    const likes = insights.likes || 0
+    const comments = insights.comments || 0
+    const saves = insights.saved || 0
+    const shares = insights.shares || 0
+
     return {
       postId,
       impressions: insights.impressions || 0,
       reach: insights.reach || 0,
-      engagement: insights.engagement || 0,
-      likes: insights.likes || 0,
-      comments: insights.comments || 0,
-      saves: insights.saved || 0,
-      shares: 0, // Not available in basic API
+      engagement: likes + comments + saves,
+      likes,
+      comments,
+      saves,
+      shares,
     }
   } catch (error) {
     console.error('Error fetching post insights:', error)
