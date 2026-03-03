@@ -1,37 +1,50 @@
 
 
-# Fix: "Unknown Error" on Facebook Reconnection
+# Fix: Empty Pages from Facebook OAuth in Development Mode
 
-## Problem
-The error message "unknown error" is thrown from a generic catch block that swallows the real failure reason. Without console logs from the production domain, we can't tell if it's:
-- A Row Level Security (RLS) policy blocking the `facebook_tokens` upsert on reconnect
-- The Facebook Graph API rejecting the token
-- The `saveUserSettings` sync failing and throwing
-- The `ensureAuth()` function creating an anonymous user instead of using the real session
+## Root Cause
+
+Your Facebook App is in **Development Mode**. In this mode, the `/me/accounts` Graph API endpoint only returns pages that the user **explicitly selects** during the OAuth consent dialog. Facebook shows a "What pages do you want to use?" step — if you skip it or don't check the box next to your page, the API returns `pages: []`, and no Page Access Token or Instagram Business Account can be retrieved.
+
+The current code silently accepts empty pages and stores null tokens, making everything appear "connected" but with no usable data.
 
 ## Changes
 
-### 1. Add granular error logging in `handleAuthCallback` (`src/lib/facebook-oauth-simple.ts`)
-- Log each step (auth check, Graph API call, DB upsert, settings sync) with labeled console messages
-- For the DB upsert error, stringify the full Supabase error object (code, message, details)
-- Return the specific step that failed in the error message (e.g., "DB upsert failed: ..." instead of "Unknown error")
-- For non-Error objects caught in the catch block, JSON.stringify them so we see the actual shape
+### 1. Add permissions check after OAuth (`src/lib/facebook-oauth-simple.ts`)
+- After receiving the access token, call `GET /me/permissions?access_token=...` to verify which permissions were actually granted
+- Log the granted vs. declined permissions
+- If `pages_show_list` was declined, return a specific error message
 
-### 2. Improve error display in `FacebookCallback.tsx`
-- Show the full error message including any nested details
-- Add a "Copy error" button so you can easily share the exact message
-- Log the raw error object to console before formatting
+### 2. Handle empty pages as a user-actionable error (`src/lib/facebook-oauth-simple.ts`)
+- When `pages.length === 0`, instead of silently continuing with null tokens:
+  - Check granted permissions first
+  - Return a clear error: **"No Facebook Pages were shared. Please reconnect and make sure to select your Facebook Page on the permissions screen."**
+- This prevents storing useless empty records in `facebook_tokens`
 
-### 3. Fix potential RLS issue on reconnect
-- The upsert to `facebook_tokens` may fail if RLS policies don't allow UPDATE for the user's own row
-- Change the upsert to explicitly specify `onConflict: 'user_id'` so Postgres knows to match on user_id
-- This ensures reconnection updates the existing row instead of trying to insert a duplicate
+### 3. Add `auth_type: rerequest` to OAuth URL (`src/lib/facebook-oauth-simple.ts`)
+- Add `auth_type=rerequest` to the OAuth URL parameters
+- This forces Facebook to re-show the permissions dialog on reconnect, letting you select your page again
+- Without this, Facebook skips the consent screen if it thinks you already authorized
 
-### 4. Guard against `ensureAuth()` creating anonymous users
-- In `handleAuthCallback`, check that the user from `supabase.auth.getUser()` is not anonymous before proceeding
-- If the session was lost during the Facebook redirect, show a clear message: "Please log in first, then try connecting again"
+### 4. Show actionable guidance on callback error page (`src/pages/FacebookCallback.tsx`)
+- When the error mentions "No Facebook Pages were shared", show step-by-step instructions:
+  1. Click "Try Again"
+  2. On the Facebook screen, look for "What Pages do you want to use?"
+  3. Check the box next to your Page
+  4. Click "Done" then "Continue"
+
+## Technical Details
+
+**File: `src/lib/facebook-oauth-simple.ts`**
+- In `getFacebookAuthUrl()`: add `auth_type: 'rerequest'` to URL params
+- In `handleAuthCallback()`: 
+  - After Step 2, add a permissions check via `/me/permissions`
+  - If `pages.length === 0`, return error instead of continuing to DB upsert
+  
+**File: `src/pages/FacebookCallback.tsx`**
+- Add conditional UI that shows page-selection instructions when error contains "No Facebook Pages"
 
 ## Expected Outcome
-- On next reconnect attempt, the callback page will show the exact error (e.g., "RLS policy violation on facebook_tokens" or "Graph API: invalid token") instead of "unknown error"
-- If the root cause is RLS, the onConflict fix will resolve it immediately
-- If it's a session issue, the user will see a clear "log in first" message
+- On next reconnect, Facebook will re-show the permissions screen with page selection
+- If user doesn't select a page, they'll see clear instructions instead of a silent failure
+- If user selects their page, tokens will be stored correctly and Facebook/Instagram data will load
