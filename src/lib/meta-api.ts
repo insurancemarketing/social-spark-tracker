@@ -90,7 +90,7 @@ export async function fetchFacebookPage(pageId: string): Promise<FacebookPageSta
 
 export async function fetchFacebookPosts(pageId: string, limit = 20): Promise<ContentItem[]> {
   const data = await metaFetch(`${pageId}/posts`, {
-    fields: "message,created_time,shares",
+    fields: "message,created_time,shares,likes.summary(true),comments.summary(true)",
     limit: String(limit),
   });
 
@@ -101,8 +101,8 @@ export async function fetchFacebookPosts(pageId: string, limit = 20): Promise<Co
     contentType: "post" as const,
     publishDate: item.created_time?.split("T")[0] || "",
     views: 0,
-    likes: 0,
-    comments: 0,
+    likes: item.likes?.summary?.total_count || 0,
+    comments: item.comments?.summary?.total_count || 0,
     shares: item.shares?.count || 0,
   }));
 }

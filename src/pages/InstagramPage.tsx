@@ -240,7 +240,7 @@ export default function InstagramPage() {
                       <p className="text-sm line-clamp-2 mb-2">{post.caption || 'No caption'}</p>
                       <p className="text-xs text-muted-foreground mb-3">{formatDate(post.timestamp)}</p>
 
-                      {postInsights && (
+                    {postInsights ? (
                         <div className="space-y-2">
                           <div className="grid grid-cols-3 gap-2 text-xs">
                             <TooltipProvider>
@@ -296,6 +296,17 @@ export default function InstagramPage() {
 
                           <div className="text-xs text-muted-foreground">
                             Reach: {formatNumber(postInsights.reach)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Heart className="h-3 w-3" />
+                            <span>{formatNumber(post.likeCount || 0)} likes</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MessageCircle className="h-3 w-3" />
+                            <span>{formatNumber(post.commentsCount || 0)} comments</span>
                           </div>
                         </div>
                       )}
