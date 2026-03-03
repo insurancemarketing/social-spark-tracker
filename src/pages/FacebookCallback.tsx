@@ -98,6 +98,17 @@ export default function FacebookCallback() {
             <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-900">
               <p className="text-sm text-red-800 dark:text-red-200 break-words whitespace-pre-wrap">{errorMessage}</p>
             </div>
+            {errorMessage.includes('No Facebook Pages') && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-900">
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">How to fix this:</p>
+                <ol className="text-sm text-amber-800 dark:text-amber-200 list-decimal list-inside space-y-1">
+                  <li>Click <strong>"Try Again"</strong> below</li>
+                  <li>On the Facebook screen, look for <strong>"What Pages do you want to use?"</strong></li>
+                  <li>Check the box next to your Facebook Page</li>
+                  <li>Click <strong>"Done"</strong>, then <strong>"Continue"</strong></li>
+                </ol>
+              </div>
+            )}
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate('/settings')}>
                 Back to Settings
