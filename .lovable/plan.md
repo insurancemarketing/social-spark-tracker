@@ -1,42 +1,37 @@
 
 
-# Fix: Facebook and Instagram Pages Not Loading After OAuth Connection
+# Fix: "Unknown Error" on Facebook Reconnection
 
-## Root Cause
-
-The OAuth connection succeeded -- tokens are stored in the `facebook_tokens` table. But the pages don't load because:
-
-1. **`meta-api.ts` still uses Graph API v19.0** (deprecated). This was missed in the previous API version updates. All other files use v22.0 but this core file still has the old version.
-
-2. **Facebook page only reads from `user_settings`** (manual config), ignoring the `facebook_tokens` table entirely. After OAuth, `user_settings` still has `meta_access_token: null` and `facebook_page_id: null`, so the Facebook page shows "Connect your Meta access token."
-
-3. **Instagram page gets stuck on "Loading..."** because it correctly detects the OAuth connection (`isConnected = true`), but the actual data fetch returns `null` -- and the UI shows "Loading..." text instead of actual data when profile is null.
+## Problem
+The error message "unknown error" is thrown from a generic catch block that swallows the real failure reason. Without console logs from the production domain, we can't tell if it's:
+- A Row Level Security (RLS) policy blocking the `facebook_tokens` upsert on reconnect
+- The Facebook Graph API rejecting the token
+- The `saveUserSettings` sync failing and throwing
+- The `ensureAuth()` function creating an anonymous user instead of using the real session
 
 ## Changes
 
-### 1. Update `src/lib/meta-api.ts` -- Fix API version
-- Change `BASE_URL` from `v19.0` to `v22.0`
+### 1. Add granular error logging in `handleAuthCallback` (`src/lib/facebook-oauth-simple.ts`)
+- Log each step (auth check, Graph API call, DB upsert, settings sync) with labeled console messages
+- For the DB upsert error, stringify the full Supabase error object (code, message, details)
+- Return the specific step that failed in the error message (e.g., "DB upsert failed: ..." instead of "Unknown error")
+- For non-Error objects caught in the catch block, JSON.stringify them so we see the actual shape
 
-### 2. Update `src/hooks/useFacebookData.ts` -- Use OAuth tokens
-- Before falling back to `user_settings`, check `facebook_tokens` table via `getFacebookTokens()` from `facebook-oauth-simple.ts`
-- Use the page access token and page ID from OAuth tokens to fetch data
-- This mirrors how `instagram-api-service.ts` already works
+### 2. Improve error display in `FacebookCallback.tsx`
+- Show the full error message including any nested details
+- Add a "Copy error" button so you can easily share the exact message
+- Log the raw error object to console before formatting
 
-### 3. Update `src/pages/FacebookPage.tsx` -- Also check OAuth connection
-- Check both `user_settings` data AND `facebook_tokens` for connection status
-- Show live data from whichever source has valid credentials
+### 3. Fix potential RLS issue on reconnect
+- The upsert to `facebook_tokens` may fail if RLS policies don't allow UPDATE for the user's own row
+- Change the upsert to explicitly specify `onConflict: 'user_id'` so Postgres knows to match on user_id
+- This ensures reconnection updates the existing row instead of trying to insert a duplicate
 
-### 4. Update `src/pages/InstagramPage.tsx` -- Fix loading state
-- When `isConnected` is true but profile is null after loading completes, show an error state instead of perpetual "Loading..."
-- Add error handling for failed API calls
+### 4. Guard against `ensureAuth()` creating anonymous users
+- In `handleAuthCallback`, check that the user from `supabase.auth.getUser()` is not anonymous before proceeding
+- If the session was lost during the Facebook redirect, show a clear message: "Please log in first, then try connecting again"
 
-### 5. Update `src/lib/instagram-api-service.ts` -- Better error surfacing
-- When API calls fail, surface the error reason rather than returning null silently
-- This helps diagnose whether the issue is permissions, token expiry, or API version
-
-## Technical Details
-
-The key architectural mismatch: the OAuth flow stores everything in `facebook_tokens`, but the Facebook page reads exclusively from `user_settings`. The sync attempt in the OAuth callback (lines 94-102 of `facebook-oauth-simple.ts`) uses `saveUserSettings` with `upsert`, but the upsert sends partial data -- only `meta_access_token`, `instagram_account_id`, and `facebook_page_id` -- while the existing row has other fields. This can cause the upsert to null out existing YouTube settings or fail silently.
-
-The fix makes both Facebook and Instagram pages check `facebook_tokens` first (OAuth path), then fall back to `user_settings` (manual path), matching the pattern Instagram's API service already uses.
-
+## Expected Outcome
+- On next reconnect attempt, the callback page will show the exact error (e.g., "RLS policy violation on facebook_tokens" or "Graph API: invalid token") instead of "unknown error"
+- If the root cause is RLS, the onConflict fix will resolve it immediately
+- If it's a session issue, the user will see a clear "log in first" message
