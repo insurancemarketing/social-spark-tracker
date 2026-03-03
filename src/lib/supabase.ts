@@ -7,7 +7,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials not found. Some features may not work.')
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
+const fallbackSupabaseUrl = 'https://placeholder.supabase.co'
+const fallbackSupabaseAnonKey = 'placeholder-anon-key'
+
+export const supabase = createClient(
+  supabaseUrl || fallbackSupabaseUrl,
+  supabaseAnonKey || fallbackSupabaseAnonKey
+)
 
 // Database types
 export interface DMEntry {
