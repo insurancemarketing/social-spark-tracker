@@ -1,50 +1,38 @@
 
 
-# Fix: Empty Pages from Facebook OAuth in Development Mode
+# Fix: Clean Up Stale OAuth State and Improve Settings UI
 
-## Root Cause
-
-Your Facebook App is in **Development Mode**. In this mode, the `/me/accounts` Graph API endpoint only returns pages that the user **explicitly selects** during the OAuth consent dialog. Facebook shows a "What pages do you want to use?" step — if you skip it or don't check the box next to your page, the API returns `pages: []`, and no Page Access Token or Instagram Business Account can be retrieved.
-
-The current code silently accepts empty pages and stores null tokens, making everything appear "connected" but with no usable data.
+## Problem
+The `facebook_tokens` table has a stale record with `pages: []` from a previous connection before our validation fix. The Settings page doesn't handle this "connected but broken" state well — it shows the Connect button instead of showing the user they need to disconnect and reconnect.
 
 ## Changes
 
-### 1. Add permissions check after OAuth (`src/lib/facebook-oauth-simple.ts`)
-- After receiving the access token, call `GET /me/permissions?access_token=...` to verify which permissions were actually granted
-- Log the granted vs. declined permissions
-- If `pages_show_list` was declined, return a specific error message
+### 1. Fix Settings page to handle stale OAuth state (`src/pages/Settings.tsx`)
+- When `isFbConnected` is true but `fbPageInfo` is null, show a warning state:
+  - "Connected but no Facebook Page was shared. Please disconnect and reconnect, making sure to select your Page."
+  - Show both Disconnect and Reconnect buttons
+- This replaces the current behavior where it silently falls through to the Connect button
 
-### 2. Handle empty pages as a user-actionable error (`src/lib/facebook-oauth-simple.ts`)
-- When `pages.length === 0`, instead of silently continuing with null tokens:
-  - Check granted permissions first
-  - Return a clear error: **"No Facebook Pages were shared. Please reconnect and make sure to select your Facebook Page on the permissions screen."**
-- This prevents storing useless empty records in `facebook_tokens`
+### 2. Add auto-cleanup for stale tokens (`src/lib/facebook-oauth-simple.ts`)
+- In `isAuthenticated()`, also check that the token has non-empty `pages` array
+- If pages is empty, return `false` — the connection is effectively broken
+- This prevents the Instagram page from thinking it's connected when it has no usable credentials
 
-### 3. Add `auth_type: rerequest` to OAuth URL (`src/lib/facebook-oauth-simple.ts`)
-- Add `auth_type=rerequest` to the OAuth URL parameters
-- This forces Facebook to re-show the permissions dialog on reconnect, letting you select your page again
-- Without this, Facebook skips the consent screen if it thinks you already authorized
-
-### 4. Show actionable guidance on callback error page (`src/pages/FacebookCallback.tsx`)
-- When the error mentions "No Facebook Pages were shared", show step-by-step instructions:
-  1. Click "Try Again"
-  2. On the Facebook screen, look for "What Pages do you want to use?"
-  3. Check the box next to your Page
-  4. Click "Done" then "Continue"
+### 3. Update `getFacebookTokens()` to validate completeness
+- After fetching the token, check if `page_access_token` is null or `pages` is empty
+- If so, log a warning and return null — forcing the user to reconnect
+- This makes all downstream consumers (Instagram page, Facebook page) correctly show "not connected"
 
 ## Technical Details
 
-**File: `src/lib/facebook-oauth-simple.ts`**
-- In `getFacebookAuthUrl()`: add `auth_type: 'rerequest'` to URL params
-- In `handleAuthCallback()`: 
-  - After Step 2, add a permissions check via `/me/permissions`
-  - If `pages.length === 0`, return error instead of continuing to DB upsert
-  
-**File: `src/pages/FacebookCallback.tsx`**
-- Add conditional UI that shows page-selection instructions when error contains "No Facebook Pages"
+**`src/lib/facebook-oauth-simple.ts`** changes:
+- `isAuthenticated()`: check `tokens.pages?.length > 0` in addition to token existence
+- `getFacebookTokens()`: return null if `page_access_token` is null (stale record)
+
+**`src/pages/Settings.tsx`** changes:
+- Add a third state: `isFbConnected && !fbPageInfo` showing a warning card with Disconnect + Reconnect buttons
 
 ## Expected Outcome
-- On next reconnect, Facebook will re-show the permissions screen with page selection
-- If user doesn't select a page, they'll see clear instructions instead of a silent failure
-- If user selects their page, tokens will be stored correctly and Facebook/Instagram data will load
+- Settings page clearly shows "broken connection" state with instructions
+- Instagram and Facebook pages correctly show "not connected" instead of loading errors
+- After user disconnects and reconnects (selecting their page), everything works
