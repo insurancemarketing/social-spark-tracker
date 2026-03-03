@@ -27,7 +27,7 @@ export function useFacebookPage() {
     queryFn: async () => {
       const creds = await resolveCredentials();
       if (!creds) return null;
-      return fetchFacebookPage(creds.pageId);
+      return fetchFacebookPage(creds.pageId, creds.token);
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
@@ -42,7 +42,7 @@ export function useFacebookPosts(limit = 20) {
     queryFn: async () => {
       const creds = await resolveCredentials();
       if (!creds) return null;
-      return fetchFacebookPosts(creds.pageId, limit);
+      return fetchFacebookPosts(creds.pageId, limit, creds.token);
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000,

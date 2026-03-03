@@ -250,6 +250,70 @@ export async function getPageInfo() {
   }
 }
 
+/**
+ * Use the long-lived user access_token to fetch a fresh page access token
+ * from /me/accounts, then update both facebook_tokens and user_settings.
+ * Returns the new page token on success, or null on failure.
+ */
+export async function refreshPageToken(): Promise<string | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data: row } = await supabase
+      .from('facebook_tokens')
+      .select('access_token, pages')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!row?.access_token) {
+      console.warn('[refreshPageToken] No long-lived user token found')
+      return null
+    }
+
+    // Call /me/accounts with the long-lived user token
+    const res = await fetch(
+      `https://graph.facebook.com/v22.0/me/accounts?access_token=${row.access_token}`
+    )
+    const json = await res.json()
+
+    if (json.error) {
+      console.error('[refreshPageToken] Graph API error:', json.error.message)
+      return null
+    }
+
+    const pages = json.data || []
+    if (pages.length === 0) {
+      console.warn('[refreshPageToken] No pages returned')
+      return null
+    }
+
+    const freshPageToken = pages[0].access_token
+    const pageId = pages[0].id
+
+    // Update facebook_tokens
+    await supabase
+      .from('facebook_tokens')
+      .update({
+        page_access_token: freshPageToken,
+        pages: pages,
+      })
+      .eq('user_id', user.id)
+
+    // Update user_settings
+    await saveUserSettings({
+      meta_access_token: freshPageToken,
+      facebook_page_id: pageId,
+    })
+
+    console.log('[refreshPageToken] Successfully refreshed page token')
+    return freshPageToken
+  } catch (err) {
+    console.error('[refreshPageToken] Unexpected error:', err)
+    return null
+  }
+}
+
 export async function disconnectFacebook(): Promise<boolean> {
   try {
     const { data: { user } } = await supabase.auth.getUser()
