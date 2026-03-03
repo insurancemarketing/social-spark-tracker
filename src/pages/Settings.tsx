@@ -174,7 +174,7 @@ export default function Settings() {
               <Instagram className="h-5 w-5 text-instagram" />
               Facebook & Instagram (OAuth)
             </CardTitle>
-            <CardDescription>Connect with one click using Facebook Login.</CardDescription>
+            <CardDescription>Connect with one click to track your personal profile posts and Instagram.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {fbLoading ? (

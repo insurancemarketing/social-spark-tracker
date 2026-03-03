@@ -1,8 +1,8 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { ContentTable } from "@/components/content/ContentTable";
-import { useFacebookPage, useFacebookPosts } from "@/hooks/useFacebookData";
-import { Eye, Users, ThumbsUp, AlertCircle } from "lucide-react";
+import { usePersonalFacebookProfile, usePersonalFacebookPosts } from "@/hooks/usePersonalFacebookData";
+import { Eye, User, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -10,19 +10,12 @@ import { useQuery } from "@tanstack/react-query";
 import { getFacebookTokens } from "@/lib/facebook-oauth-simple";
 import { useAuth } from "@/contexts/AuthContext";
 
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return n.toString();
-}
-
 export default function FacebookPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: page, isLoading: pageLoading } = useFacebookPage();
-  const { data: posts } = useFacebookPosts();
+  const { data: profile, isLoading: profileLoading } = usePersonalFacebookProfile();
+  const { data: posts } = usePersonalFacebookPosts();
 
-  // Also check if user has OAuth tokens stored
   const { data: oauthTokens } = useQuery({
     queryKey: ["facebook-oauth-tokens", user?.id],
     queryFn: () => getFacebookTokens(),
@@ -30,7 +23,7 @@ export default function FacebookPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isLive = !!page;
+  const isLive = !!profile;
   const hasOAuth = !!oauthTokens;
 
   return (
@@ -41,18 +34,18 @@ export default function FacebookPage() {
             <span className="text-facebook">Facebook</span> Analytics
           </h1>
           <p className="text-sm text-muted-foreground">
-            {isLive ? `Live data for ${page.name}` : "Connect your Facebook page to see analytics"}
+            {isLive ? `Personal profile: ${profile.name}` : "Connect your Facebook account to see your posts"}
           </p>
         </div>
 
-        {!isLive && !pageLoading && (
+        {!isLive && !profileLoading && (
           <Card className="border-warning/30 bg-warning/5">
             <CardContent className="flex items-center gap-3 py-4">
               <AlertCircle className="h-5 w-5 text-warning" />
               <p className="text-sm">
                 {hasOAuth
-                  ? "Connected via OAuth but unable to load page data — check console for API errors."
-                  : "Connect your Meta access token and Facebook Page ID in Settings to see live data."}
+                  ? "Connected but unable to load profile data. You may need to disconnect and reconnect to grant the user_posts permission."
+                  : "Connect your Facebook account in Settings to track your personal posts."}
               </p>
               <Button size="sm" variant="outline" className="ml-auto" onClick={() => navigate("/settings")}>
                 Go to Settings
@@ -63,15 +56,14 @@ export default function FacebookPage() {
 
         {isLive && (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <StatsCard title="Page Followers" value={formatNumber(page.followersCount)} icon={<Users className="h-4 w-4" />} />
-              <StatsCard title="Fan Count" value={formatNumber(page.fanCount)} icon={<ThumbsUp className="h-4 w-4" />} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <StatsCard title="Profile" value={profile.name} icon={<User className="h-4 w-4" />} />
               <StatsCard title="Posts Loaded" value={String(posts?.length || 0)} icon={<Eye className="h-4 w-4" />} />
             </div>
 
             {posts && posts.length > 0 && (
               <div>
-                <h2 className="mb-4 text-lg font-semibold">Recent Content</h2>
+                <h2 className="mb-4 text-lg font-semibold">Recent Posts</h2>
                 <ContentTable data={posts} />
               </div>
             )}

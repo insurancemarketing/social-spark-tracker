@@ -127,3 +127,34 @@ export async function fetchFacebookPosts(pageId: string, limit = 20, token?: str
     shares: item.shares?.count || 0,
   }));
 }
+
+// ── Personal Facebook Profile ─────────────────────────────────
+
+export interface PersonalFacebookProfile {
+  name: string;
+  id: string;
+}
+
+export async function fetchPersonalProfile(token: string): Promise<PersonalFacebookProfile> {
+  const data = await metaFetch("me", { fields: "name,id" }, token);
+  return { name: data.name, id: data.id };
+}
+
+export async function fetchPersonalPosts(limit = 20, token?: string): Promise<ContentItem[]> {
+  const data = await metaFetch("me/posts", {
+    fields: "message,created_time,shares,likes.summary(true),comments.summary(true)",
+    limit: String(limit),
+  }, token);
+
+  return (data.data || []).map((item: any) => ({
+    id: item.id,
+    title: item.message?.slice(0, 80) || "Untitled Post",
+    platform: "facebook" as const,
+    contentType: "post" as const,
+    publishDate: item.created_time?.split("T")[0] || "",
+    views: 0,
+    likes: item.likes?.summary?.total_count || 0,
+    comments: item.comments?.summary?.total_count || 0,
+    shares: item.shares?.count || 0,
+  }));
+}
