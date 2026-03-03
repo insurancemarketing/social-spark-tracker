@@ -1,51 +1,39 @@
 
 
-# Fix Instagram Token Refresh + Enable DM Tracking
+# How to Set Up the Instagram DM Webhook
 
-## Two Problems Found
+This is a manual setup in your Meta App Dashboard — no code changes needed. Here's the step-by-step:
 
-### Problem 1: Instagram page is broken (token expired again)
-The auto-refresh we built in `metaFetch()` works -- but `InstagramPage.tsx` doesn't use it. It calls `instagram-api-service.ts` which makes **raw `fetch()` calls** directly to the Graph API, completely bypassing `metaFetch` and its auto-refresh logic. So the expired page token is never refreshed for the Instagram page.
+## Your Webhook URL
 
-### Problem 2: Instagram DMs aren't tracked
-Three things are missing:
-1. **OAuth scopes**: The login flow requests `instagram_basic`, `instagram_manage_insights`, etc. but does NOT request `instagram_manage_messages` -- the permission Meta requires to receive DM webhooks.
-2. **Webhook not registered**: The `dm-webhook` edge function exists but its URL needs to be registered in your Meta App Dashboard under Webhooks with the `messages` subscription.
-3. **Outbound DMs**: Meta webhooks only deliver inbound messages. To track messages *you* send, we need a polling mechanism that periodically calls the Instagram Conversations API to fetch recent threads.
+Your edge function URL is:
 
-## Plan
+```text
+https://tkavzevkgavcxsvtizlu.supabase.co/functions/v1/dm-webhook
+```
 
-### 1. Fix Instagram auto-refresh (`src/lib/instagram-api-service.ts`)
-- Replace all raw `fetch()` calls with calls to `metaFetch` from `meta-api.ts` (which already handles 190 errors and auto-refreshes)
-- This fixes the "Session has expired" error on the Instagram page without duplicating refresh logic
+Your verify token (hardcoded in the edge function) is:
 
-### 2. Add messaging permission to OAuth flow (`src/lib/facebook-oauth-simple.ts`)
-- Add `instagram_manage_messages` to the `FACEBOOK_SCOPES` list
-- This will prompt the user to grant messaging access on next reconnect, enabling DM webhooks
+```text
+social_spark_tracker_2024
+```
 
-### 3. Create a DM polling edge function (`supabase/functions/poll-instagram-dms/index.ts`)
-- New edge function that uses the stored page access token to call the Instagram Conversations API (`/{ig-account-id}/conversations` and `/{conversation-id}/messages`)
-- Fetches both inbound and outbound messages from recent conversations
-- Inserts any new messages into `automated_dms` (deduplicating by `message_id`)
-- Can be triggered manually from the UI or scheduled via cron
+## Steps in Meta App Dashboard
 
-### 4. Add "Sync DMs" button to the DM Pipeline page (`src/pages/DMPipelineWithSupabase.tsx`)
-- Add a "Sync DMs Now" button that invokes the `poll-instagram-dms` edge function
-- Shows a loading state while syncing
-- Refreshes the DM list after sync completes
+1. Go to [developers.facebook.com](https://developers.facebook.com) and open your app (App ID: `2064832041041409`)
+2. In the left sidebar, click **Webhooks** (or find it under **Add Product** if not yet added)
+3. Select **Instagram** from the dropdown at the top
+4. Click **Subscribe to this object**
+5. Fill in:
+   - **Callback URL**: `https://tkavzevkgavcxsvtizlu.supabase.co/functions/v1/dm-webhook`
+   - **Verify Token**: `social_spark_tracker_2024`
+6. Click **Verify and Save** — Meta will send a GET request to your edge function, which will respond with the challenge token
+7. After verification succeeds, find the **messages** field in the list and toggle the **Subscribe** checkbox next to it
 
-### 5. User setup step (no code -- manual action)
-After reconnecting Facebook with the new permissions, you'll need to:
-- Go to Meta App Dashboard > Webhooks
-- Subscribe to `messages` field for your Instagram account
-- Set the callback URL to your `dm-webhook` edge function URL
+## Important Notes
 
-## File Summary
-
-| File | Change |
-|------|--------|
-| `src/lib/instagram-api-service.ts` | Route all API calls through `metaFetch` for auto-refresh |
-| `src/lib/facebook-oauth-simple.ts` | Add `instagram_manage_messages` to OAuth scopes |
-| `supabase/functions/poll-instagram-dms/index.ts` | New edge function to poll conversations API for inbound + outbound DMs |
-| `src/pages/DMPipelineWithSupabase.tsx` | Add "Sync DMs Now" button to trigger polling |
+- Your app is in **Development Mode**, so webhooks will only fire for messages from users who are added as testers/admins in your Meta app
+- To receive DMs from all users, your app needs to go through **Meta App Review** for the `instagram_manage_messages` permission
+- You also need to **reconnect your Facebook account** in your app's Settings page to grant the new `instagram_manage_messages` permission we just added to the OAuth flow
+- Once the webhook is verified, **inbound** DMs will automatically appear in your DM Pipeline. For **outbound** DMs (messages you send), use the "Sync DMs Now" button on the DM Pipeline page
 
