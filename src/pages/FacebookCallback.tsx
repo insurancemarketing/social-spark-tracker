@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { handleAuthCallback } from '@/lib/facebook-oauth-simple'
+import { exchangeCodeForToken } from '@/lib/facebook-oauth-supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 export default function FacebookCallback() {
   const navigate = useNavigate()
@@ -12,25 +14,48 @@ export default function FacebookCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Facebook uses hash fragment for implicit flow
-        const hash = window.location.hash.substring(1)
-        const params = new URLSearchParams(hash)
-        const accessToken = params.get('access_token')
+        // Check for errors in query params or hash
+        const queryParams = new URLSearchParams(window.location.search)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
 
-        if (!accessToken) {
-          throw new Error('No access token received from Facebook')
+        const error = queryParams.get('error') || hashParams.get('error')
+        const errorDescription = queryParams.get('error_description') || hashParams.get('error_description')
+        const errorReason = queryParams.get('error_reason') || hashParams.get('error_reason')
+
+        if (error) {
+          const message = errorDescription
+            ? decodeURIComponent(errorDescription)
+            : errorReason
+              ? decodeURIComponent(errorReason)
+              : `Facebook returned error: ${error}`
+          throw new Error(message)
         }
 
-        const result = await handleAuthCallback(accessToken)
-
-        if (result.success) {
-          setStatus('success')
-          setTimeout(() => {
-            navigate('/instagram')
-          }, 2000)
-        } else {
+        // Try implicit flow (access_token in hash)
+        const accessToken = hashParams.get('access_token')
+        if (accessToken) {
+          const result = await handleAuthCallback(accessToken)
+          if (result.success) {
+            setStatus('success')
+            setTimeout(() => navigate('/instagram'), 2000)
+            return
+          }
           throw new Error(result.error || 'Failed to authenticate')
         }
+
+        // Try authorization code flow (code in query)
+        const code = queryParams.get('code')
+        if (code) {
+          const result = await exchangeCodeForToken(code)
+          if (result.success) {
+            setStatus('success')
+            setTimeout(() => navigate('/instagram'), 2000)
+            return
+          }
+          throw new Error(result.error || 'Failed to exchange authorization code')
+        }
+
+        throw new Error('No access token or authorization code received from Facebook. Make sure your app permissions and redirect URI are configured correctly.')
       } catch (error) {
         console.error('Callback error:', error)
         setStatus('error')
@@ -60,9 +85,17 @@ export default function FacebookCallback() {
           </CardDescription>
         </CardHeader>
         {status === 'error' && (
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-900">
               <p className="text-sm text-red-800 dark:text-red-200">{errorMessage}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate('/settings')}>
+                Back to Settings
+              </Button>
+              <Button onClick={() => navigate('/instagram')}>
+                Try Again
+              </Button>
             </div>
           </CardContent>
         )}
