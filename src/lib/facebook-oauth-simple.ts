@@ -9,7 +9,6 @@ const FACEBOOK_REDIRECT_URI = 'https://social.masonvanmeter.com/facebook/callbac
 const FACEBOOK_SCOPES = [
   'pages_show_list',
   'pages_read_engagement',
-  'pages_read_user_content',
   'instagram_basic',
   'instagram_manage_insights',
   'business_management'
@@ -24,7 +23,7 @@ export function getFacebookAuthUrl(): string {
     state: Math.random().toString(36).substring(7),
   })
 
-  return `https://www.facebook.com/v18.0/dialog/oauth?${params.toString()}`
+  return `https://www.facebook.com/v22.0/dialog/oauth?${params.toString()}`
 }
 
 export function initiateFacebookAuth(): void {
@@ -43,7 +42,7 @@ export async function handleAuthCallback(accessToken: string): Promise<{ success
 
     // Get user's Facebook pages
     const pagesResponse = await fetch(
-      `https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}`
+      `https://graph.facebook.com/v22.0/me/accounts?access_token=${accessToken}`
     )
 
     const pagesData = await pagesResponse.json()
@@ -63,7 +62,7 @@ export async function handleAuthCallback(accessToken: string): Promise<{ success
       const page = pages[0]
 
       const igResponse = await fetch(
-        `https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${pageAccessToken}`
+        `https://graph.facebook.com/v22.0/${page.id}?fields=instagram_business_account&access_token=${pageAccessToken}`
       )
 
       const igData = await igResponse.json()

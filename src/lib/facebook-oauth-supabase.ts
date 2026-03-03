@@ -23,7 +23,7 @@ export function getFacebookAuthUrl(): string {
     state: Math.random().toString(36).substring(7), // CSRF protection
   })
 
-  return `https://www.facebook.com/v18.0/dialog/oauth?${params.toString()}`
+  return `https://www.facebook.com/v22.0/dialog/oauth?${params.toString()}`
 }
 
 export function initiateFacebookAuth(): void {

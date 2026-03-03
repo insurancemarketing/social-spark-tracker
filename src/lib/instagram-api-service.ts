@@ -71,7 +71,7 @@ export async function fetchInstagramProfile(): Promise<InstagramProfile | null> 
     const accessToken = tokens.accessToken
 
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${igAccountId}?fields=id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url&access_token=${accessToken}`
+      `https://graph.facebook.com/v22.0/${igAccountId}?fields=id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url&access_token=${accessToken}`
     )
 
     const data = await response.json()
@@ -108,7 +108,7 @@ export async function fetchInstagramPosts(limit: number = 25): Promise<Instagram
     const accessToken = tokens.accessToken
 
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${igAccountId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,username&limit=${limit}&access_token=${accessToken}`
+      `https://graph.facebook.com/v22.0/${igAccountId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,thumbnail_url,username&limit=${limit}&access_token=${accessToken}`
     )
 
     const data = await response.json()
@@ -143,7 +143,7 @@ export async function fetchPostInsights(postId: string): Promise<InstagramInsigh
 
     // Fetch insights for the post
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${postId}/insights?metric=impressions,reach,engagement,saved,likes,comments&access_token=${accessToken}`
+      `https://graph.facebook.com/v22.0/${postId}/insights?metric=impressions,reach,engagement,saved,likes,comments&access_token=${accessToken}`
     )
 
     const data = await response.json()
@@ -191,7 +191,7 @@ export async function fetchAccountInsights(period: 'day' | 'week' | 'days_28' = 
     const accessToken = tokens.accessToken
 
     const response = await fetch(
-      `https://graph.facebook.com/v18.0/${igAccountId}/insights?metric=impressions,reach,follower_count,profile_views&period=${period}&access_token=${accessToken}`
+      `https://graph.facebook.com/v22.0/${igAccountId}/insights?metric=impressions,reach,follower_count,profile_views&period=${period}&access_token=${accessToken}`
     )
 
     const data = await response.json()
