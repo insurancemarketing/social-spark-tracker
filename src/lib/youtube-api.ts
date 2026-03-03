@@ -1,25 +1,28 @@
-import { ContentItem, DailyMetric } from "./types";
+import { ContentItem } from "./types";
+import { getUserSettings, saveUserSettings } from "./user-settings-service";
 
 const BASE_URL = "https://www.googleapis.com/youtube/v3";
 
-export function getYouTubeApiKey(): string | null {
-  return localStorage.getItem("youtube_api_key");
+export async function getYouTubeApiKey(): Promise<string | null> {
+  const settings = await getUserSettings();
+  return settings.youtube_api_key;
 }
 
-export function setYouTubeApiKey(key: string) {
-  localStorage.setItem("youtube_api_key", key);
+export async function setYouTubeApiKey(key: string) {
+  await saveUserSettings({ youtube_api_key: key });
 }
 
-export function getYouTubeChannelId(): string | null {
-  return localStorage.getItem("youtube_channel_id");
+export async function getYouTubeChannelId(): Promise<string | null> {
+  const settings = await getUserSettings();
+  return settings.youtube_channel_id;
 }
 
-export function setYouTubeChannelId(id: string) {
-  localStorage.setItem("youtube_channel_id", id);
+export async function setYouTubeChannelId(id: string) {
+  await saveUserSettings({ youtube_channel_id: id });
 }
 
 async function ytFetch(endpoint: string, params: Record<string, string>) {
-  const apiKey = getYouTubeApiKey();
+  const apiKey = await getYouTubeApiKey();
   if (!apiKey) throw new Error("YouTube API key not set");
   const url = new URL(`${BASE_URL}/${endpoint}`);
   url.searchParams.set("key", apiKey);

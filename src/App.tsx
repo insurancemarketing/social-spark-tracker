@@ -7,7 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import ContentTracker from "./pages/ContentTracker";
-import DMPipeline from "./pages/DMPipeline";
+import DMPipeline from "./pages/DMPipelineWithSupabase";
 import YouTubePage from "./pages/YouTubePage";
 import YouTubeCallback from "./pages/YouTubeCallback";
 import FacebookCallback from "./pages/FacebookCallback";

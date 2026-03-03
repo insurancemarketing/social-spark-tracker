@@ -1,22 +1,23 @@
 import { ContentItem } from "./types";
+import { getUserSettings, saveUserSettings } from "./user-settings-service";
 
 const BASE_URL = "https://graph.facebook.com/v19.0";
 
-// ── localStorage helpers ──────────────────────────────────────
+// ── Async getters/setters backed by Supabase ──────────────────
 
-export const getMetaAccessToken = () => localStorage.getItem("meta_access_token");
-export const setMetaAccessToken = (t: string) => localStorage.setItem("meta_access_token", t);
+export const getMetaAccessToken = async () => (await getUserSettings()).meta_access_token;
+export const setMetaAccessToken = async (t: string) => saveUserSettings({ meta_access_token: t });
 
-export const getInstagramAccountId = () => localStorage.getItem("instagram_account_id");
-export const setInstagramAccountId = (id: string) => localStorage.setItem("instagram_account_id", id);
+export const getInstagramAccountId = async () => (await getUserSettings()).instagram_account_id;
+export const setInstagramAccountId = async (id: string) => saveUserSettings({ instagram_account_id: id });
 
-export const getFacebookPageId = () => localStorage.getItem("facebook_page_id");
-export const setFacebookPageId = (id: string) => localStorage.setItem("facebook_page_id", id);
+export const getFacebookPageId = async () => (await getUserSettings()).facebook_page_id;
+export const setFacebookPageId = async (id: string) => saveUserSettings({ facebook_page_id: id });
 
 // ── Shared fetch helper ───────────────────────────────────────
 
 async function metaFetch(endpoint: string, params: Record<string, string> = {}) {
-  const token = getMetaAccessToken();
+  const token = await getMetaAccessToken();
   if (!token) throw new Error("Meta access token not set");
   const url = new URL(`${BASE_URL}/${endpoint}`);
   url.searchParams.set("access_token", token);

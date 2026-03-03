@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { signIn, signUp } from '@/lib/auth'
+import { signIn } from '@/lib/auth'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
 
@@ -13,22 +13,15 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [isSignUp, setIsSignUp] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      if (isSignUp) {
-        await signUp(email, password)
-        toast.success('Account created! Please check your email to verify.')
-        setIsSignUp(false)
-      } else {
-        await signIn(email, password)
-        toast.success('Logged in successfully!')
-        navigate('/')
-      }
+      await signIn(email, password)
+      toast.success('Logged in successfully!')
+      navigate('/')
     } catch (error) {
       toast.error((error as Error).message)
     } finally {
@@ -44,7 +37,7 @@ export default function Login() {
             Social Spark Tracker
           </CardTitle>
           <CardDescription className="text-center">
-            {isSignUp ? 'Create your account' : 'Sign in to your account'}
+            Sign in to your account
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -74,11 +67,6 @@ export default function Login() {
                 disabled={loading}
                 minLength={6}
               />
-              {isSignUp && (
-                <p className="text-xs text-muted-foreground">
-                  Must be at least 6 characters
-                </p>
-              )}
             </div>
 
             <Button
@@ -87,21 +75,8 @@ export default function Login() {
               disabled={loading}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSignUp ? 'Create Account' : 'Sign In'}
+              Sign In
             </Button>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sm text-primary hover:underline"
-                disabled={loading}
-              >
-                {isSignUp
-                  ? 'Already have an account? Sign in'
-                  : "Don't have an account? Sign up"}
-              </button>
-            </div>
           </form>
         </CardContent>
       </Card>
