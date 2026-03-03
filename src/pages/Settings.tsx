@@ -8,7 +8,7 @@ import { getUserSettings, saveUserSettings, clearSettingsCache } from "@/lib/use
 import { Check, Key, Hash, Facebook, Instagram, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { initiateFacebookAuth, isAuthenticated, getPageInfo, disconnectFacebook } from "@/lib/facebook-oauth-simple";
+import { initiateFacebookAuth, isAuthenticated, getPageInfo, disconnectFacebook, hasAnyFacebookRecord } from "@/lib/facebook-oauth-simple";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Settings() {
@@ -29,6 +29,7 @@ export default function Settings() {
   const [isFbConnected, setIsFbConnected] = useState(false);
   const [fbPageInfo, setFbPageInfo] = useState<any>(null);
   const [fbLoading, setFbLoading] = useState(true);
+  const [hasStaleRecord, setHasStaleRecord] = useState(false);
 
   // Load settings from Supabase on mount
   useEffect(() => {
@@ -59,6 +60,12 @@ export default function Settings() {
     if (connected) {
       const info = await getPageInfo();
       setFbPageInfo(info);
+      setHasStaleRecord(false);
+    } else {
+      // Check if there's a stale record (row exists but incomplete)
+      const hasRecord = await hasAnyFacebookRecord();
+      setHasStaleRecord(hasRecord);
+      setFbPageInfo(null);
     }
     setFbLoading(false);
   };
@@ -185,6 +192,17 @@ export default function Settings() {
                   </div>
                 )}
                 <Button variant="destructive" onClick={handleDisconnectFacebook}>Disconnect</Button>
+              </div>
+            ) : hasStaleRecord ? (
+              <div className="space-y-3">
+                <div className="p-3 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-900">
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">Connected but no Facebook Page was shared</p>
+                  <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">Please disconnect and reconnect, making sure to select your Facebook Page on the permissions screen.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="destructive" onClick={handleDisconnectFacebook}>Disconnect</Button>
+                  <Button onClick={handleConnectFacebook}>Reconnect</Button>
+                </div>
               </div>
             ) : (
               <Button onClick={handleConnectFacebook} className="w-full">
