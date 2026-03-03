@@ -1,5 +1,5 @@
 // Simplified Facebook/Instagram OAuth - No Edge Function Needed
-import { supabase, ensureAuth } from './supabase'
+import { supabase } from './supabase'
 import { saveUserSettings } from './user-settings-service'
 
 const FACEBOOK_APP_ID = '2064832031041409'
@@ -33,14 +33,28 @@ export function initiateFacebookAuth(): void {
 
 export async function handleAuthCallback(accessToken: string): Promise<{ success: boolean; error?: string }> {
   try {
-    await ensureAuth()
-
+    console.log('[FB Auth] Step 1: Checking authentication...')
     const { data: { user } } = await supabase.auth.getUser()
+    
     if (!user) {
-      throw new Error('No user found')
+      // Don't use ensureAuth() here — we need a real logged-in user, not anonymous
+      return {
+        success: false,
+        error: 'No authenticated session found. Please log in first, then try connecting Facebook again.'
+      }
     }
 
+    if (user.is_anonymous) {
+      return {
+        success: false,
+        error: 'You are signed in anonymously. Please log in with email first, then try connecting Facebook again.'
+      }
+    }
+
+    console.log('[FB Auth] Step 1 OK: User', user.id)
+
     // Get user's Facebook pages
+    console.log('[FB Auth] Step 2: Fetching Facebook pages...')
     const pagesResponse = await fetch(
       `https://graph.facebook.com/v22.0/me/accounts?access_token=${accessToken}`
     )
@@ -48,10 +62,15 @@ export async function handleAuthCallback(accessToken: string): Promise<{ success
     const pagesData = await pagesResponse.json()
 
     if (pagesData.error) {
-      throw new Error(pagesData.error.message)
+      console.error('[FB Auth] Step 2 FAILED: Graph API error', pagesData.error)
+      return {
+        success: false,
+        error: `Facebook Graph API error: ${pagesData.error.message} (code: ${pagesData.error.code}, type: ${pagesData.error.type})`
+      }
     }
 
     const pages = pagesData.data || []
+    console.log('[FB Auth] Step 2 OK: Found', pages.length, 'pages')
 
     // Get Instagram Business Account ID from the first page
     let instagramBusinessAccountId = null
@@ -61,19 +80,22 @@ export async function handleAuthCallback(accessToken: string): Promise<{ success
       pageAccessToken = pages[0].access_token
       const page = pages[0]
 
+      console.log('[FB Auth] Step 3: Fetching Instagram business account for page', page.id)
       const igResponse = await fetch(
         `https://graph.facebook.com/v22.0/${page.id}?fields=instagram_business_account&access_token=${pageAccessToken}`
       )
 
       const igData = await igResponse.json()
       instagramBusinessAccountId = igData.instagram_business_account?.id || null
+      console.log('[FB Auth] Step 3 OK: Instagram ID =', instagramBusinessAccountId)
     }
 
     // User access tokens from implicit flow last 60 days
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 60)
 
-    // Store in database
+    // Store in database with explicit onConflict to handle reconnection
+    console.log('[FB Auth] Step 4: Upserting facebook_tokens...')
     const { error: dbError } = await supabase
       .from('facebook_tokens')
       .upsert({
@@ -83,37 +105,47 @@ export async function handleAuthCallback(accessToken: string): Promise<{ success
         page_access_token: pageAccessToken,
         instagram_business_account_id: instagramBusinessAccountId,
         pages: pages,
-      })
+      }, { onConflict: 'user_id' })
 
     if (dbError) {
-      console.error('Database error:', dbError)
-      throw dbError
+      console.error('[FB Auth] Step 4 FAILED: DB upsert error', JSON.stringify(dbError))
+      return {
+        success: false,
+        error: `Database error: ${dbError.message} (code: ${dbError.code}, details: ${dbError.details})`
+      }
     }
+    console.log('[FB Auth] Step 4 OK: Tokens saved')
 
     // Sync tokens into user_settings so Facebook/Instagram pages work automatically
+    console.log('[FB Auth] Step 5: Syncing to user_settings...')
     try {
       await saveUserSettings({
         meta_access_token: pageAccessToken || accessToken,
         instagram_account_id: instagramBusinessAccountId,
         facebook_page_id: pages.length > 0 ? pages[0].id : null,
       })
+      console.log('[FB Auth] Step 5 OK: Settings synced')
     } catch (syncError) {
-      console.warn('Failed to sync tokens to user_settings:', syncError)
+      console.warn('[FB Auth] Step 5 WARNING: Settings sync failed (non-fatal):', syncError)
     }
 
     return { success: true }
   } catch (error) {
-    console.error('Error handling auth callback:', error)
+    console.error('[FB Auth] Unexpected error:', error)
+    const message = error instanceof Error
+      ? error.message
+      : typeof error === 'object'
+        ? JSON.stringify(error)
+        : String(error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: `Unexpected error: ${message}`
     }
   }
 }
 
 export async function getFacebookTokens() {
   try {
-    await ensureAuth()
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
