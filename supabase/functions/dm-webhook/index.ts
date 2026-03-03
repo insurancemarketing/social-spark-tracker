@@ -3,10 +3,34 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret, x-hub-signature, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret, x-hub-signature',
 }
 
 const VERIFY_TOKEN = 'social_spark_tracker_2024'
+
+// Get Facebook Page Access Token from Supabase Edge Function secrets
+const PAGE_ACCESS_TOKEN = Deno.env.get('FB_PAGE_ACCESS_TOKEN')
+
+async function getSenderInfo(senderId: string) {
+  if (!PAGE_ACCESS_TOKEN) {
+    return { name: `Facebook User ${senderId.substring(0, 8)}`, username: senderId }
+  }
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/v18.0/${senderId}?fields=name,first_name,last_name&access_token=${PAGE_ACCESS_TOKEN}`
+    )
+    const data = await response.json()
+
+    if (data.name) {
+      return { name: data.name, username: senderId }
+    }
+  } catch (error) {
+    console.error('Error fetching sender info:', error)
+  }
+
+  return { name: `Facebook User ${senderId.substring(0, 8)}`, username: senderId }
+}
 
 serve(async (req) => {
   const url = new URL(req.url)
@@ -74,15 +98,14 @@ serve(async (req) => {
                 const messageId = event.message.mid
                 const timestamp = new Date(event.timestamp).toISOString()
 
-                // Get sender info from Facebook Graph API (optional - for now use ID)
-                const senderUsername = senderId
-                const senderName = `Facebook User ${senderId.substring(0, 8)}`
+                // Fetch sender's actual name from Facebook
+                const senderInfo = await getSenderInfo(senderId)
 
                 await supabase.from('automated_dms').insert({
                   user_id: userId,
                   platform: 'facebook',
-                  sender_username: senderUsername,
-                  sender_name: senderName,
+                  sender_username: senderInfo.username,
+                  sender_name: senderInfo.name,
                   message_text: messageText,
                   message_id: messageId,
                   conversation_id: senderId,
