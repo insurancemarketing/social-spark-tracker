@@ -1,0 +1,2 @@
+[functions.dm-webhook]
+verify_jwt = false
