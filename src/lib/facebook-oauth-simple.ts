@@ -19,7 +19,8 @@ export function getFacebookAuthUrl(): string {
     client_id: FACEBOOK_APP_ID,
     redirect_uri: FACEBOOK_REDIRECT_URI,
     scope: FACEBOOK_SCOPES,
-    response_type: 'token', // Using implicit flow (simpler, no server needed)
+    response_type: 'token',
+    auth_type: 'rerequest',
     state: Math.random().toString(36).substring(7),
   })
 
@@ -71,6 +72,36 @@ export async function handleAuthCallback(accessToken: string): Promise<{ success
 
     const pages = pagesData.data || []
     console.log('[FB Auth] Step 2 OK: Found', pages.length, 'pages')
+
+    // Step 2b: Check granted permissions
+    console.log('[FB Auth] Step 2b: Checking granted permissions...')
+    try {
+      const permsResponse = await fetch(
+        `https://graph.facebook.com/v22.0/me/permissions?access_token=${accessToken}`
+      )
+      const permsData = await permsResponse.json()
+      const granted = (permsData.data || []).filter((p: any) => p.status === 'granted').map((p: any) => p.permission)
+      const declined = (permsData.data || []).filter((p: any) => p.status === 'declined').map((p: any) => p.permission)
+      console.log('[FB Auth] Step 2b: Granted:', granted.join(', '))
+      if (declined.length > 0) console.log('[FB Auth] Step 2b: Declined:', declined.join(', '))
+
+      if (declined.includes('pages_show_list')) {
+        return {
+          success: false,
+          error: 'The "pages_show_list" permission was declined. Please reconnect and grant all requested permissions.'
+        }
+      }
+    } catch (permErr) {
+      console.warn('[FB Auth] Step 2b WARNING: Could not check permissions:', permErr)
+    }
+
+    // Fail if no pages were shared
+    if (pages.length === 0) {
+      return {
+        success: false,
+        error: 'No Facebook Pages were shared. Please reconnect and make sure to select your Facebook Page on the permissions screen. In Development Mode, you must explicitly check the box next to your Page.'
+      }
+    }
 
     // Get Instagram Business Account ID from the first page
     let instagramBusinessAccountId = null
