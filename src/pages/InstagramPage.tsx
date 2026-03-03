@@ -38,7 +38,7 @@ export default function InstagramPage() {
       const manualIgId = getInstagramAccountId();
       const connected = oauthConnected || (manualToken && manualIgId);
 
-      setIsConnected(connected);
+      setIsConnected(!!connected);
 
       if (connected) {
         // Load profile

@@ -125,7 +125,7 @@ export async function getDMStats() {
 
     if (error) {
       console.error('Error fetching DM stats:', error)
-      return { total: 0, new: 0, responded: 0, archived: 0 }
+      return { total: 0, new: 0, responded: 0, archived: 0, instagram: 0, facebook: 0 }
     }
 
     const stats = {
