@@ -40,7 +40,7 @@ serve(async (req) => {
     if (action === 'exchange') {
       // Exchange authorization code for access token
       const tokenResponse = await fetch(
-        `https://graph.facebook.com/v18.0/oauth/access_token?` +
+        `https://graph.facebook.com/v22.0/oauth/access_token?` +
           `client_id=${FACEBOOK_APP_ID}&` +
           `redirect_uri=${FACEBOOK_REDIRECT_URI}&` +
           `client_secret=${FACEBOOK_APP_SECRET}&` +
@@ -55,7 +55,7 @@ serve(async (req) => {
 
       // Exchange short-lived token for long-lived token
       const longLivedResponse = await fetch(
-        `https://graph.facebook.com/v18.0/oauth/access_token?` +
+        `https://graph.facebook.com/v22.0/oauth/access_token?` +
           `grant_type=fb_exchange_token&` +
           `client_id=${FACEBOOK_APP_ID}&` +
           `client_secret=${FACEBOOK_APP_SECRET}&` +
@@ -70,7 +70,7 @@ serve(async (req) => {
 
       // Get user's Facebook pages
       const pagesResponse = await fetch(
-        `https://graph.facebook.com/v18.0/me/accounts?access_token=${longLivedData.access_token}`
+        `https://graph.facebook.com/v22.0/me/accounts?access_token=${longLivedData.access_token}`
       )
 
       const pagesData = await pagesResponse.json()
@@ -85,7 +85,7 @@ serve(async (req) => {
         const page = pages[0]
 
         const igResponse = await fetch(
-          `https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${pageAccessToken}`
+          `https://graph.facebook.com/v22.0/${page.id}?fields=instagram_business_account&access_token=${pageAccessToken}`
         )
 
         const igData = await igResponse.json()
@@ -105,7 +105,7 @@ serve(async (req) => {
           expires_at: expiresAt.toISOString(),
           page_access_token: pageAccessToken,
           instagram_business_account_id: instagramBusinessAccountId,
-          pages: JSON.stringify(pages),
+          pages: pages,
         })
 
       if (dbError) {
@@ -130,7 +130,7 @@ serve(async (req) => {
 
       // Exchange for new long-lived token
       const refreshResponse = await fetch(
-        `https://graph.facebook.com/v18.0/oauth/access_token?` +
+        `https://graph.facebook.com/v22.0/oauth/access_token?` +
           `grant_type=fb_exchange_token&` +
           `client_id=${FACEBOOK_APP_ID}&` +
           `client_secret=${FACEBOOK_APP_SECRET}&` +
