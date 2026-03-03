@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { getUserSettings, saveUserSettings, clearSettingsCache } from "@/lib/user-settings-service";
-import { Check, Key, Hash, Facebook, Instagram, Copy, Loader2 } from "lucide-react";
+import { Check, Key, Hash, Facebook, Instagram, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { initiateFacebookAuth, isAuthenticated, getPageInfo, disconnectFacebook } from "@/lib/facebook-oauth-simple";
@@ -50,12 +50,7 @@ export default function Settings() {
     checkFacebookConnection();
   }, []);
 
-  const copyUserId = () => {
-    if (user?.id) {
-      navigator.clipboard.writeText(user.id);
-      toast.success("User ID copied to clipboard!");
-    }
-  };
+
 
   const checkFacebookConnection = async () => {
     setFbLoading(true);
@@ -135,25 +130,6 @@ export default function Settings() {
           <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
           <p className="text-sm text-muted-foreground">Configure your API connections (stored securely in the database)</p>
         </div>
-
-        {/* User ID for Make.com */}
-        <Card className="border-2 border-primary/20 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950">
-          <CardHeader>
-            <CardTitle>Your User ID (for Make.com)</CardTitle>
-            <CardDescription>Copy this ID and use it in your Make.com webhook configuration</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Input value={user?.id || ""} readOnly className="font-mono text-sm" />
-              <Button onClick={copyUserId} size="sm">
-                <Copy className="h-4 w-4 mr-2" /> Copy
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Use this ID in the <code className="bg-muted px-1 rounded">user_id</code> field when setting up Make.com DM automation
-            </p>
-          </CardContent>
-        </Card>
 
         {/* YouTube */}
         <Card>

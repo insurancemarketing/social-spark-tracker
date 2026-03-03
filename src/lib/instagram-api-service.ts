@@ -13,9 +13,9 @@ async function getTokensAndAccountId() {
     }
   }
 
-  // Fall back to manual localStorage
-  const manualToken = getMetaAccessToken()
-  const manualIgId = getInstagramAccountId()
+  // Fall back to manual (user_settings in Supabase)
+  const manualToken = await getMetaAccessToken()
+  const manualIgId = await getInstagramAccountId()
   if (manualToken && manualIgId) {
     return {
       accessToken: manualToken,
