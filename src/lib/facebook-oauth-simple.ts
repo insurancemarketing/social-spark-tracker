@@ -12,7 +12,8 @@ const FACEBOOK_SCOPES = [
   'instagram_basic',
   'instagram_manage_insights',
   'instagram_manage_messages',
-  'business_management'
+  'business_management',
+  'user_posts'
 ].join(',')
 
 export function getFacebookAuthUrl(): string {
