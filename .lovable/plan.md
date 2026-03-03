@@ -1,38 +1,32 @@
 
 
-# Integrate Automated DMs into DM Pipeline Page
+# Auto-Refresh Meta Tokens So It Never Breaks
 
 ## Problem
-The DM Pipeline page only shows manually entered data from the "Add Entry" form. The `automated_dms` table (populated via Make.com webhooks) has actual Instagram/Facebook DM data, but it's not surfaced anywhere on this page. The Chat Stages chart and Conversion Funnel are empty because no manual entries have been logged.
+`metaFetch()` always reads the token from `user_settings.meta_access_token`, which is a page token that expires. Meanwhile, `useFacebookData.ts` resolves a fresh token from `facebook_tokens` but never passes it to the fetch functions -- they ignore it and read the stale one from `user_settings`.
 
-## Solution
-Merge the automated DMs data into the DM Pipeline page so the user can see their real Instagram and Facebook DM activity alongside (or instead of) manual entries.
+## Fix (Two Parts)
 
-### Changes
+### 1. Pass token through instead of always reading from DB (`src/lib/meta-api.ts`)
+- Add an optional `tokenOverride` parameter to `metaFetch()` so callers can pass a token directly
+- Add the same optional `token` parameter to `fetchFacebookPage`, `fetchFacebookPosts`, `fetchInstagramProfile`, `fetchInstagramMedia`
+- When provided, use it instead of reading from `user_settings`
+- On a 190 error (expired token), attempt auto-refresh: call `/me/accounts` with the long-lived user token from `facebook_tokens`, get a fresh page token, update both `facebook_tokens.page_access_token` and `user_settings.meta_access_token`, then retry the original request once
 
-**1. `src/pages/DMPipelineWithSupabase.tsx`**
-- Import and display the `AutomatedDMsList` component as a new tab alongside "View Entries" and "Add Entry"
-- Add a new "Automated DMs" tab that shows the webhook-captured DMs with their status (new/responded/archived)
-- Pull `getDMStats()` from `automated-dms-service` and show automated DM counts (total Instagram DMs, total Facebook DMs) in the top stats grid
-- Add cards for "Instagram DMs Received" and "Facebook DMs Received" sourced from the automated_dms table
+### 2. Update hooks to pass resolved token (`src/hooks/useFacebookData.ts`, `src/hooks/useInstagramData.ts`)
+- `useFacebookData.ts`: pass `creds.token` to `fetchFacebookPage(pageId, token)` and `fetchFacebookPosts(pageId, limit, token)`
+- `useInstagramData.ts`: resolve token from `facebook_tokens` first (like `useFacebookData` does), pass it to `fetchInstagramProfile` and `fetchInstagramMedia`
 
-**2. `src/components/dm/ChatStagesChart.tsx`**
-- Accept an optional `automatedStats` prop with counts from `automated_dms` (new, responded, archived)
-- When no manual stage entries exist, use the automated DM statuses as a proxy for the pie chart: new = CONNECT, responded = QUALIFY, archived = CONVERT
-- This way the chart shows real distribution even without manual entry
-
-**3. `src/components/dm/DMFunnelChart.tsx`**
-- Accept optional `automatedDMCount` prop
-- When manual entries have 0 chats started, use automated DM total as the "Chats Started" top-of-funnel number so the funnel isn't completely empty
-
-**4. `src/lib/types.ts`** (if needed)
-- Ensure `DMPlatform` type includes `'instagram'` (it likely already does)
+### 3. Add `refreshPageToken()` to `src/lib/facebook-oauth-simple.ts`
+- Export a function that reads the long-lived `access_token` from `facebook_tokens`, calls `https://graph.facebook.com/v22.0/me/accounts`, gets a fresh page token, and updates both DB tables
+- This is called automatically by `metaFetch` on 190 errors -- no manual action needed
 
 ## File Summary
 
 | File | Change |
 |------|--------|
-| `src/pages/DMPipelineWithSupabase.tsx` | Add Automated DMs tab, show automated DM stats in header cards |
-| `src/components/dm/ChatStagesChart.tsx` | Fall back to automated DM status distribution when no manual stage data |
-| `src/components/dm/DMFunnelChart.tsx` | Use automated DM count as fallback for top-of-funnel |
+| `src/lib/meta-api.ts` | Add token passthrough to `metaFetch` and all fetch functions; auto-refresh on 190 error |
+| `src/lib/facebook-oauth-simple.ts` | Add `refreshPageToken()` that uses long-lived token to get fresh page token |
+| `src/hooks/useFacebookData.ts` | Pass resolved token to fetch functions |
+| `src/hooks/useInstagramData.ts` | Resolve token from `facebook_tokens` first, pass to fetch functions |
 
