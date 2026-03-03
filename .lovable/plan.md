@@ -1,65 +1,42 @@
 
-Root cause from your screenshots is now clear and it’s a two-part failure:
 
-1) Facebook is still receiving a request that includes `pages_read_user_content` (deprecated), which causes the “Invalid Scopes” dialog.  
-2) After you click OK, the app callback currently expects only `access_token`, so it falls through to “No access token received from Facebook” instead of showing the real OAuth error details.
+# Fix: Facebook and Instagram Pages Not Loading After OAuth Connection
 
-I inspected your code and found a mismatch: there are two Facebook OAuth implementations in the repo, and one of them (`facebook-oauth-supabase.ts`) still includes `pages_read_user_content`. The callback page also only handles implicit-token responses.
+## Root Cause
 
-## Implementation plan
+The OAuth connection succeeded -- tokens are stored in the `facebook_tokens` table. But the pages don't load because:
 
-### 1) Normalize OAuth scope + API version everywhere
-- Update `src/lib/facebook-oauth-supabase.ts`:
-  - Remove `pages_read_user_content` from `FACEBOOK_SCOPES`.
-  - Keep only:
-    - `pages_show_list`
-    - `pages_read_engagement`
-    - `instagram_basic`
-    - `instagram_manage_insights`
-    - `business_management`
-- Keep API version consistently at `v22.0` across all Facebook/Instagram files.
+1. **`meta-api.ts` still uses Graph API v19.0** (deprecated). This was missed in the previous API version updates. All other files use v22.0 but this core file still has the old version.
 
-### 2) Make callback robust to real Facebook responses
-- Update `src/pages/FacebookCallback.tsx` to support all callback shapes:
-  - `#access_token=...` (implicit flow)
-  - `?code=...` (authorization code flow)
-  - `error`, `error_reason`, `error_description` (both in query and hash)
-- If Facebook returns an OAuth error, surface the exact decoded message in UI instead of generic “No access token received”.
+2. **Facebook page only reads from `user_settings`** (manual config), ignoring the `facebook_tokens` table entirely. After OAuth, `user_settings` still has `meta_access_token: null` and `facebook_page_id: null`, so the Facebook page shows "Connect your Meta access token."
 
-### 3) Support both flows safely (prevents this from recurring)
-- In `FacebookCallback.tsx`:
-  - If `access_token` exists → call existing `handleAuthCallback`.
-  - If `code` exists → call `exchangeCodeForToken` from `facebook-oauth-supabase.ts`.
-- This prevents breakage if any environment still initiates code flow.
+3. **Instagram page gets stuck on "Loading..."** because it correctly detects the OAuth connection (`isConnected = true`), but the actual data fetch returns `null` -- and the UI shows "Loading..." text instead of actual data when profile is null.
 
-### 4) Fix token data consistency for downstream UI
-- Update `supabase/functions/facebook-oauth/index.ts`:
-  - Use `v22.0`.
-  - Store `pages` as JSON (not `JSON.stringify`) to match table type and frontend expectations.
-- Ensure connected page info remains readable in Settings/Instagram UI after code-flow exchange.
+## Changes
 
-### 5) Add clearer diagnostics for this exact failure mode
-- In callback UI, show actionable error text for:
-  - Invalid scopes
-  - Missing permissions
-  - User-cancelled auth
-- This removes “mystery failure” loops and makes future debugging much faster.
+### 1. Update `src/lib/meta-api.ts` -- Fix API version
+- Change `BASE_URL` from `v19.0` to `v22.0`
 
-## Manual checks required (Facebook dashboard)
-For app `2064832031041409`, verify:
-- Facebook Login product is added.
-- Valid OAuth Redirect URI includes:
-  - `https://social.masonvanmeter.com/facebook/callback`
-- Required permissions are enabled for the app/use case:
-  - `pages_show_list`
-  - `pages_read_engagement`
-  - `instagram_basic`
-  - `instagram_manage_insights`
-  - `business_management`
-- Your testing account is added as app Admin/Developer/Tester (if app in development mode).
+### 2. Update `src/hooks/useFacebookData.ts` -- Use OAuth tokens
+- Before falling back to `user_settings`, check `facebook_tokens` table via `getFacebookTokens()` from `facebook-oauth-simple.ts`
+- Use the page access token and page ID from OAuth tokens to fetch data
+- This mirrors how `instagram-api-service.ts` already works
 
-## Expected outcome after these changes
-- No more `pages_read_user_content` in OAuth requests.
-- If Facebook rejects anything, you’ll see the exact reason on callback page.
-- If the response is `code` instead of `access_token`, callback still completes correctly.
-- OAuth connection status should become stable across Settings and Instagram pages.
+### 3. Update `src/pages/FacebookPage.tsx` -- Also check OAuth connection
+- Check both `user_settings` data AND `facebook_tokens` for connection status
+- Show live data from whichever source has valid credentials
+
+### 4. Update `src/pages/InstagramPage.tsx` -- Fix loading state
+- When `isConnected` is true but profile is null after loading completes, show an error state instead of perpetual "Loading..."
+- Add error handling for failed API calls
+
+### 5. Update `src/lib/instagram-api-service.ts` -- Better error surfacing
+- When API calls fail, surface the error reason rather than returning null silently
+- This helps diagnose whether the issue is permissions, token expiry, or API version
+
+## Technical Details
+
+The key architectural mismatch: the OAuth flow stores everything in `facebook_tokens`, but the Facebook page reads exclusively from `user_settings`. The sync attempt in the OAuth callback (lines 94-102 of `facebook-oauth-simple.ts`) uses `saveUserSettings` with `upsert`, but the upsert sends partial data -- only `meta_access_token`, `instagram_account_id`, and `facebook_page_id` -- while the existing row has other fields. This can cause the upsert to null out existing YouTube settings or fail silently.
+
+The fix makes both Facebook and Instagram pages check `facebook_tokens` first (OAuth path), then fall back to `user_settings` (manual path), matching the pattern Instagram's API service already uses.
+
