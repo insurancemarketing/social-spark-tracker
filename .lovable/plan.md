@@ -1,24 +1,38 @@
 
 
-# Sync dm-webhook codebase with deployed version
+## Plan: Track Personal Facebook Profile Posts
 
-## Problem
-The deployed `dm-webhook` edge function on Supabase has additional functionality not reflected in the codebase — specifically a `getSenderInfo` helper that fetches real Facebook user names via the Graph API using `FB_PAGE_ACCESS_TOKEN`.
+### The Problem
+The current Facebook integration is built entirely around **Facebook Pages** (business entities). Your personal profile is different — the Graph API uses `user_posts` permission instead of `pages_*` permissions, and there are no follower/fan count fields.
 
-## Changes
+### What We'll Build
 
-| File | Change |
-|------|--------|
-| `supabase/functions/dm-webhook/index.ts` | Replace with the deployed version: add `PAGE_ACCESS_TOKEN` env var, add `getSenderInfo()` function, update Facebook message handler to use it |
+**1. Add `user_posts` to OAuth scopes**
+Update `facebook-oauth-simple.ts` to include `user_posts` in the scopes list so the OAuth flow grants permission to read your personal posts.
 
-Key differences from current codebase:
-1. Adds `const PAGE_ACCESS_TOKEN = Deno.env.get('FB_PAGE_ACCESS_TOKEN')` 
-2. Adds `getSenderInfo(senderId)` function that calls Graph API `/v18.0/{senderId}?fields=name,first_name,last_name`
-3. Facebook messaging handler calls `getSenderInfo` instead of hardcoding sender name
-4. CORS headers revert to the simpler set (matching deployed version)
+**2. Add personal profile API functions in `meta-api.ts`**
+- `fetchPersonalProfile(token)` — calls `/me?fields=name,id` to get your name
+- `fetchPersonalPosts(limit, token)` — calls `/me/posts?fields=message,created_time,shares,likes.summary(true),comments.summary(true)` to get your personal timeline posts with engagement data
 
-## Next Steps
-Since the webhook is already deployed and live, after syncing the code I can help you:
-- Set up a Make.com scenario to forward Instagram DMs to this webhook
-- Or test the webhook directly with Meta's webhook subscription
+**3. Create `usePersonalFacebookData.ts` hook**
+A new hook that resolves the user's access token (from `facebook_tokens.access_token` — the *user* token, not the page token) and calls the personal profile endpoints.
+
+**4. Update `FacebookPage.tsx` to show personal posts**
+Rework the page to:
+- Remove the Page-specific stats (followers, fan count) that don't apply to personal profiles
+- Show your name and total posts loaded
+- Display your personal posts in the existing `ContentTable` with likes, comments, and shares
+- Keep the "connect" prompt if no token exists
+
+**5. Update Settings page label**
+Change the Facebook OAuth card description to clarify it now covers personal profile tracking too (no functional change needed — the same OAuth flow works, just with the added `user_posts` scope).
+
+### Important Limitation
+After changing scopes, you'll need to **disconnect and reconnect** Facebook in Settings so the new `user_posts` permission gets granted.
+
+### Technical Notes
+- Personal profile uses the **user access token** (`access_token`), not the page access token
+- The `/me/posts` endpoint returns posts you've made on your own timeline
+- Engagement data (likes, comments, shares) is available on your own posts
+- No reach/impressions data is available for personal profiles via the API
 
