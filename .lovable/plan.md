@@ -1,64 +1,34 @@
 
 
-# Instagram + Facebook Live API Integration
+# Fix 4 Build Errors
 
-## The Big Win
+All four are simple TypeScript type fixes — no new features, no new files.
 
-One Meta Developer App gives you **both** Instagram and Facebook live data. Same access token, same setup — two platforms connected at once.
+## Fixes
 
-## What Gets Built
+### 1. `src/pages/InstagramPage.tsx` (line 41)
+`connected` resolves to `string | true` instead of `boolean`. Fix: wrap in `!!` to coerce to boolean.
 
-### 1. Meta Graph API Library (`src/lib/meta-api.ts`)
-- Shared fetch helper for the Meta Graph API (graph.facebook.com)
-- **Instagram functions**: fetch profile stats (followers, media count), fetch recent media with metrics (reach, impressions, likes, comments, saves)
-- **Facebook functions**: fetch page stats (followers, post reach), fetch recent posts with metrics (reactions, comments, shares, reach)
-- Token and ID getters/setters using localStorage (same pattern as YouTube)
+**Before:** `setIsConnected(connected)`
+**After:** `setIsConnected(!!connected)`
 
-### 2. React Query Hooks
-- `src/hooks/useInstagramData.ts` — hooks for Instagram profile and media
-- `src/hooks/useFacebookData.ts` — hooks for Facebook page and posts
+### 2. `src/components/dm/AutomatedDMsList.tsx` — stats type mismatch
+The `getDMStats()` error path on line 128 returns `{ total, new, responded, archived }` (missing `instagram` and `facebook`), but the component expects all 6 fields. Fix: add `instagram: 0, facebook: 0` to the error return on line 128 of `automated-dms-service.ts`.
 
-### 3. Settings Page Update
-Replace the "Other Platforms" placeholder card with two real configuration sections:
-- **Instagram**: Access Token field + Instagram Business Account ID field
-- **Facebook**: Uses same access token + Facebook Page ID field
-- Each has a "Save & Connect" button that invalidates the relevant queries
-- Helpful links to where to find your account/page IDs
+**Before:** `return { total: 0, new: 0, responded: 0, archived: 0 }`
+**After:** `return { total: 0, new: 0, responded: 0, archived: 0, instagram: 0, facebook: 0 }`
 
-### 4. Instagram Page — Live Data
-- Same pattern as YouTube: show live data when token is set, fall back to mock data otherwise
-- Warning banner with "Go to Settings" button when not connected
-- Stats cards: Reach, Followers, Likes, Saves (from real API)
-- Recent media table with real engagement numbers
+### 3. `supabase/functions/facebook-oauth/index.ts` (line 171)
+`error` is typed as `unknown`. Fix: cast it.
 
-### 5. Facebook Page — Live Data
-- Same live/mock pattern
-- Stats cards: Reach, Page Followers, Reactions, Shares (from real API)
-- Recent posts table with real metrics
+**Before:** `error.message`
+**After:** `(error as Error).message`
 
-## API Endpoints Used
+### 4. `supabase/functions/youtube-oauth/index.ts` (line 174)
+Same issue.
 
-| Platform | Endpoint | Data |
-|----------|----------|------|
-| Instagram | `GET /{ig-user-id}?fields=followers_count,media_count,username` | Profile stats |
-| Instagram | `GET /{ig-user-id}/media?fields=caption,timestamp,like_count,comments_count,media_type,permalink,thumbnail_url,insights.metric(reach,impressions,saved)` | Post-level metrics |
-| Facebook | `GET /{page-id}?fields=name,followers_count,fan_count` | Page stats |
-| Facebook | `GET /{page-id}/posts?fields=message,created_time,shares,insights.metric(post_impressions,post_reactions_by_type_total)` | Post metrics |
+**Before:** `error.message`
+**After:** `(error as Error).message`
 
-## What You'll Need (one-time setup)
-
-1. A **Meta Developer App** at developers.facebook.com
-2. Your **Instagram Professional Account** linked to a **Facebook Page**
-3. A **long-lived access token** (valid 60 days, can be refreshed)
-4. Your **Instagram Business Account ID** and **Facebook Page ID**
-
-I can walk you through each step after we build this.
-
-## Technical Approach
-
-- Follows the exact same architecture as the YouTube integration
-- Access token stored in localStorage (it's a user token, not a secret server key)
-- React Query handles caching and refetching (5-minute stale time)
-- Graceful fallback to mock data when not connected
-- Error handling with user-friendly messages
-
+## Summary
+Four one-line fixes across four files. No new features or dependencies. Build should be clean after these.
